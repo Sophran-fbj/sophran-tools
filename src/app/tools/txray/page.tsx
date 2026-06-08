@@ -36,17 +36,17 @@ export default function TxRayPage() {
             </div>
           </Link>
 
-          <div className="card bg-base-200 opacity-60">
+          <Link
+            href="/tools/txray/decoder"
+            className="card bg-base-200 transition hover:bg-base-300"
+          >
             <div className="card-body">
-              <h2 className="card-title">
-                交易解码
-                <span className="badge badge-ghost badge-sm">敬请期待</span>
-              </h2>
+              <h2 className="card-title">交易解码</h2>
               <p className="text-sm text-base-content/70">
                 粘贴 calldata 或 tx hash，用人话解释这笔交易在干什么。
               </p>
             </div>
-          </div>
+          </Link>
         </div>
       </div>
     </main>
