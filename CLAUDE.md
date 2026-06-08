@@ -63,6 +63,7 @@ pnpm lint
 - `NEXT_PUBLIC_WC_PROJECT_ID` —— WalletConnect/Reown Project ID（RainbowKit 必需）
 - `NEXT_PUBLIC_ALCHEMY_ID` —— Alchemy API key（RPC）
 - `ETHERSCAN_API_KEY` —— 授权历史查询（服务端用，勿加 NEXT_PUBLIC 前缀）
+- `DEV_PROXY`（仅国内本地开发）—— 服务端 fetch 走代理，绕过 GFW 对 `api.etherscan.io` 的连接重置（ECONNRESET）。值为代理本地 HTTP/混合端口，如 `http://127.0.0.1:10808`。由 `src/instrumentation.ts` + undici 注入；Vercel 等海外部署不要设。
 
 ## 约定
 
