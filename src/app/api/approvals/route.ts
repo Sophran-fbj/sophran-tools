@@ -1,5 +1,10 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { isAddress, getAddress } from 'viem';
+import { isAddress, getAddress, toEventSelector } from 'viem';
+import {
+  PERMIT2_ADDRESS,
+  PERMIT2_APPROVAL_EVENT,
+  PERMIT2_PERMIT_EVENT,
+} from '@/features/txray/approvals/permit2';
 
 // keccak256("Approval(address,address,uint256)")
 const APPROVAL_TOPIC0 =
@@ -7,6 +12,9 @@ const APPROVAL_TOPIC0 =
 // keccak256("ApprovalForAll(address,address,bool)")
 const APPROVAL_FOR_ALL_TOPIC0 =
   '0x17307eab39ab6107e8899845ad3d59bd9653f200f220920489ca2b5937696c31';
+// Permit2 事件 topic0：运行时计算，避免硬编码出错
+const PERMIT2_APPROVAL_TOPIC0 = toEventSelector(PERMIT2_APPROVAL_EVENT);
+const PERMIT2_PERMIT_TOPIC0 = toEventSelector(PERMIT2_PERMIT_EVENT);
 
 const ETHERSCAN_BASE = 'https://api.etherscan.io/v2/api';
 
@@ -15,15 +23,17 @@ interface EtherscanLog {
   topics: string[];
 }
 
-// 按 topic0(事件签名) + topic1(owner) 跨所有合约拉日志，分页，无 10 区块限制
+const topicToAddress = (t: string) => getAddress(`0x${t.slice(-40)}`);
+
 async function fetchAllLogs(
   chainId: number,
   topic0: string,
   ownerTopic: string,
   apiKey: string,
+  contractAddress?: string,
 ): Promise<EtherscanLog[]> {
   const offset = 1000;
-  const maxPages = 10; // 上限 1 万条，超活跃地址会截断（MVP 取舍）
+  const maxPages = 10;
   const all: EtherscanLog[] = [];
 
   for (let page = 1; page <= maxPages; page++) {
@@ -31,6 +41,7 @@ async function fetchAllLogs(
     url.searchParams.set('chainid', String(chainId));
     url.searchParams.set('module', 'logs');
     url.searchParams.set('action', 'getLogs');
+    if (contractAddress) url.searchParams.set('address', contractAddress);
     url.searchParams.set('topic0', topic0);
     url.searchParams.set('topic1', ownerTopic);
     url.searchParams.set('topic0_1_opr', 'and');
@@ -55,14 +66,28 @@ async function fetchAllLogs(
   return all;
 }
 
-// 从日志里提取去重后的 (token, spender) 对；spender/operator 在 topics[2]
-function dedupePairs(logs: EtherscanLog[]) {
+// ERC20/NFT：topic1=owner, topic2=spender
+function dedupeSpenderPairs(logs: EtherscanLog[]) {
   const map = new Map<string, { token: string; spender: string }>();
   for (const log of logs) {
     const spenderTopic = log.topics?.[2];
     if (!spenderTopic) continue;
     const token = getAddress(log.address);
-    const spender = getAddress(`0x${spenderTopic.slice(-40)}`);
+    const spender = topicToAddress(spenderTopic);
+    map.set(`${token}-${spender}`, { token, spender });
+  }
+  return [...map.values()];
+}
+
+// Permit2：topic1=owner, topic2=token, topic3=spender
+function dedupePermit2Pairs(logs: EtherscanLog[]) {
+  const map = new Map<string, { token: string; spender: string }>();
+  for (const log of logs) {
+    const tokenTopic = log.topics?.[2];
+    const spenderTopic = log.topics?.[3];
+    if (!tokenTopic || !spenderTopic) continue;
+    const token = topicToAddress(tokenTopic);
+    const spender = topicToAddress(spenderTopic);
     map.set(`${token}-${spender}`, { token, spender });
   }
   return [...map.values()];
@@ -86,13 +111,16 @@ export async function GET(req: NextRequest) {
   const ownerTopic = `0x${ownerParam.slice(2).toLowerCase().padStart(64, '0')}`;
 
   try {
-    const [erc20Logs, nftLogs] = await Promise.all([
+    const [erc20Logs, nftLogs, p2ApprovalLogs, p2PermitLogs] = await Promise.all([
       fetchAllLogs(chainId, APPROVAL_TOPIC0, ownerTopic, apiKey),
       fetchAllLogs(chainId, APPROVAL_FOR_ALL_TOPIC0, ownerTopic, apiKey),
+      fetchAllLogs(chainId, PERMIT2_APPROVAL_TOPIC0, ownerTopic, apiKey, PERMIT2_ADDRESS),
+      fetchAllLogs(chainId, PERMIT2_PERMIT_TOPIC0, ownerTopic, apiKey, PERMIT2_ADDRESS),
     ]);
     return NextResponse.json({
-      erc20: dedupePairs(erc20Logs),
-      nft: dedupePairs(nftLogs),
+      erc20: dedupeSpenderPairs(erc20Logs),
+      nft: dedupeSpenderPairs(nftLogs),
+      permit2: dedupePermit2Pairs([...p2ApprovalLogs, ...p2PermitLogs]),
     });
   } catch (e) {
     const err = e as Error & { cause?: unknown };

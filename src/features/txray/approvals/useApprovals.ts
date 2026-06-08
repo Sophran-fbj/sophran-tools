@@ -9,8 +9,12 @@ import {
   type Address,
   type PublicClient,
 } from 'viem';
+import {
+  PERMIT2_ADDRESS,
+  PERMIT2_UNLIMITED_THRESHOLD,
+  permit2Abi,
+} from './permit2';
 
-// 超过这个量级即视为「无限授权」
 const UNLIMITED_THRESHOLD = 2n ** 200n;
 
 export interface Erc20Approval {
@@ -33,7 +37,20 @@ export interface NftApproval {
   symbol: string;
 }
 
-export type Approval = Erc20Approval | NftApproval;
+export interface Permit2Approval {
+  kind: 'permit2';
+  id: string;
+  token: Address;
+  spender: Address;
+  amount: bigint;
+  expiration: number; // unix 秒
+  unlimited: boolean;
+  symbol: string;
+  decimals: number;
+  amountText: string;
+}
+
+export type Approval = Erc20Approval | NftApproval | Permit2Approval;
 
 interface Pair {
   token: Address;
@@ -44,6 +61,11 @@ const pairKey = (token: Address, spender: Address) =>
   `${token.toLowerCase()}-${spender.toLowerCase()}`;
 
 const shortAddr = (addr: string) => `${addr.slice(0, 6)}…${addr.slice(-4)}`;
+
+const isRisky = (a: Approval) =>
+  (a.kind === 'erc20' && a.unlimited) ||
+  (a.kind === 'permit2' && a.unlimited) ||
+  a.kind === 'nft';
 
 export function useApprovals(owner: Address | undefined, chainId = 1) {
   const client = usePublicClient({ chainId });
@@ -61,15 +83,16 @@ async function fetchApprovals(
   owner: Address,
   chainId: number,
 ): Promise<Approval[]> {
-  // 1) 历史授权对来自服务端（Etherscan getLogs，绕开 Alchemy 免费版 10 区块限制）
+  // 1) 历史授权对来自服务端（Etherscan getLogs）
   const res = await fetch(`/api/approvals?owner=${owner}&chainId=${chainId}`);
   const json = await res.json();
   if (!res.ok) throw new Error(json.error ?? '获取授权记录失败');
   const erc20Pairs = json.erc20 as Pair[];
   const nftPairs = json.nft as Pair[];
+  const permit2Pairs = json.permit2 as Pair[];
 
-  // 2) multicall 校验「当前」额度 / 授权状态（eth_call，不受 getLogs 限制）
-  const [allowances, nftApproved] = await Promise.all([
+  // 2) multicall 校验当前状态
+  const [allowances, nftApproved, permit2Allowances] = await Promise.all([
     erc20Pairs.length
       ? client.multicall({
           allowFailure: true,
@@ -92,6 +115,17 @@ async function fetchApprovals(
           })),
         })
       : [],
+    permit2Pairs.length
+      ? client.multicall({
+          allowFailure: true,
+          contracts: permit2Pairs.map((p) => ({
+            address: PERMIT2_ADDRESS,
+            abi: permit2Abi,
+            functionName: 'allowance',
+            args: [owner, p.token, p.spender],
+          })),
+        })
+      : [],
   ]);
 
   const liveErc20 = erc20Pairs
@@ -111,12 +145,26 @@ async function fetchApprovals(
     return r?.status === 'success' && r.result === true;
   });
 
-  // 3) multicall 读元数据
+  const now = Math.floor(Date.now() / 1000);
+  const livePermit2 = permit2Pairs
+    .map((p, i) => {
+      const r = permit2Allowances[i];
+      if (r?.status !== 'success') return null;
+      const [amount, expiration] = r.result as readonly [bigint, bigint, bigint];
+      return { ...p, amount, expiration: Number(expiration) };
+    })
+    .filter(
+      (x): x is { token: Address; spender: Address; amount: bigint; expiration: number } =>
+        x !== null && x.amount > 0n && x.expiration > now,
+    );
+
+  // 3) multicall 读元数据（symbol / decimals）—— ERC20 与 Permit2 的 token 都是 ERC20
+  const erc20MetaTokens = [...liveErc20, ...livePermit2];
   const [erc20Meta, nftMeta] = await Promise.all([
-    liveErc20.length
+    erc20MetaTokens.length
       ? client.multicall({
           allowFailure: true,
-          contracts: liveErc20.flatMap((p) => [
+          contracts: erc20MetaTokens.flatMap((p) => [
             { address: p.token, abi: erc20Abi, functionName: 'symbol' } as const,
             { address: p.token, abi: erc20Abi, functionName: 'decimals' } as const,
           ]),
@@ -134,14 +182,21 @@ async function fetchApprovals(
       : [],
   ]);
 
-  // 4) 组装
-  const erc20Result: Erc20Approval[] = liveErc20.map((p, i) => {
+  const readMeta = (i: number) => {
     const symbolRes = erc20Meta[i * 2];
     const decimalsRes = erc20Meta[i * 2 + 1];
-    const symbol =
-      symbolRes?.status === 'success' ? String(symbolRes.result) : shortAddr(p.token);
-    const decimals =
-      decimalsRes?.status === 'success' ? Number(decimalsRes.result) : 18;
+    return {
+      symbol:
+        symbolRes?.status === 'success'
+          ? String(symbolRes.result)
+          : shortAddr(erc20MetaTokens[i].token),
+      decimals: decimalsRes?.status === 'success' ? Number(decimalsRes.result) : 18,
+    };
+  };
+
+  // 4) 组装
+  const erc20Result: Erc20Approval[] = liveErc20.map((p, i) => {
+    const { symbol, decimals } = readMeta(i);
     const unlimited = p.allowance > UNLIMITED_THRESHOLD;
     return {
       kind: 'erc20',
@@ -153,6 +208,23 @@ async function fetchApprovals(
       symbol,
       decimals,
       amountText: unlimited ? '无限' : formatUnits(p.allowance, decimals),
+    };
+  });
+
+  const permit2Result: Permit2Approval[] = livePermit2.map((p, i) => {
+    const { symbol, decimals } = readMeta(liveErc20.length + i);
+    const unlimited = p.amount > PERMIT2_UNLIMITED_THRESHOLD;
+    return {
+      kind: 'permit2',
+      id: `p2-${pairKey(p.token, p.spender)}`,
+      token: p.token,
+      spender: p.spender,
+      amount: p.amount,
+      expiration: p.expiration,
+      unlimited,
+      symbol,
+      decimals,
+      amountText: unlimited ? '无限' : formatUnits(p.amount, decimals),
     };
   });
 
@@ -168,10 +240,8 @@ async function fetchApprovals(
     };
   });
 
-  // 无限授权排前面，更显眼
-  return [...erc20Result, ...nftResult].sort(
-    (a, b) =>
-      Number(b.kind === 'erc20' && b.unlimited) -
-      Number(a.kind === 'erc20' && a.unlimited),
+  // 高风险（无限 / NFT 全集合）排前面
+  return [...erc20Result, ...permit2Result, ...nftResult].sort(
+    (a, b) => Number(isRisky(b)) - Number(isRisky(a)),
   );
 }

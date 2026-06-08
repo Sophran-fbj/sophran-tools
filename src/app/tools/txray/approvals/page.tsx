@@ -14,6 +14,7 @@ import { erc20Abi, erc721Abi, isAddress, type Address } from 'viem';
 import { normalize } from 'viem/ens';
 import { useApprovals, type Approval } from '@/features/txray/approvals/useApprovals';
 import { getSpenderLabel } from '@/features/txray/approvals/spenderLabels';
+import { PERMIT2_ADDRESS, permit2Abi } from '@/features/txray/approvals/permit2';
 
 export default function ApprovalsPage() {
   const { address: connected } = useAccount();
@@ -41,9 +42,9 @@ export default function ApprovalsPage() {
 
   const { data: approvals, isLoading, isError, error } = useApprovals(target, 1);
 
-  // 只能撤销「自己钱包」的授权：已连接 且 正在看的就是这个地址
   const canRevoke =
     !!connected && !!target && connected.toLowerCase() === target.toLowerCase();
+  const hasPermit2 = approvals?.some((a) => a.kind === 'permit2');
 
   return (
     <main className="min-h-screen bg-base-100 px-6 py-12">
@@ -112,7 +113,7 @@ export default function ApprovalsPage() {
               <div className="card bg-base-200">
                 <div className="card-body items-center gap-3 text-base-content/60">
                   <span className="loading loading-spinner loading-md text-primary" />
-                  <span>扫描链上授权中…（全历史事件 + multicall 校验）</span>
+                  <span>扫描链上授权中…（含 Permit2，全历史事件 + multicall 校验）</span>
                 </div>
               </div>
             )}
@@ -152,6 +153,24 @@ export default function ApprovalsPage() {
                     </p>
                   )}
                 </div>
+
+                {hasPermit2 && (
+                  <details className="collapse-arrow collapse mb-3 bg-base-200 text-sm">
+                    <summary className="collapse-title font-medium">
+                      ℹ️ 什么是 Permit2 授权？为什么也要管
+                    </summary>
+                    <div className="collapse-content text-base-content/70">
+                      你在 Uniswap 等应用点的 approve，很多时候是授权给{' '}
+                      <span className="font-mono">Permit2</span>{' '}
+                      合约，由它再把额度分发给具体的 spender（如 Universal
+                      Router），带额度和到期时间。所以「授权给 Permit2」只是表层——
+                      这里列出的{' '}
+                      <span className="badge badge-info badge-sm">Permit2</span>{' '}
+                      条目，才是 Permit2 内部替你授权的真实对象，它们才是真正能动你币的权限。
+                    </div>
+                  </details>
+                )}
+
                 <div className="overflow-x-auto rounded-box border border-base-300">
                   <table className="table">
                     <thead>
@@ -187,7 +206,6 @@ function ApprovalRow({ a, canRevoke }: { a: Approval; canRevoke: boolean }) {
   const { writeContract, data: hash, isPending, error: writeError } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
 
-  // 撤销成功后刷新列表，该行（额度已归零）会被过滤掉
   useEffect(() => {
     if (isSuccess) queryClient.invalidateQueries({ queryKey: ['approvals'] });
   }, [isSuccess, queryClient]);
@@ -200,12 +218,20 @@ function ApprovalRow({ a, canRevoke }: { a: Approval; canRevoke: boolean }) {
         functionName: 'approve',
         args: [a.spender, 0n],
       });
-    } else {
+    } else if (a.kind === 'nft') {
       writeContract({
         address: a.token,
         abi: erc721Abi,
         functionName: 'setApprovalForAll',
         args: [a.spender, false],
+      });
+    } else {
+      // permit2：在 Permit2 合约上把额度置 0
+      writeContract({
+        address: PERMIT2_ADDRESS,
+        abi: permit2Abi,
+        functionName: 'approve',
+        args: [a.token, a.spender, 0n, 0],
       });
     }
   };
@@ -220,6 +246,9 @@ function ApprovalRow({ a, canRevoke }: { a: Approval; canRevoke: boolean }) {
           <span className="font-semibold">{a.symbol}</span>
           {a.kind === 'nft' && (
             <span className="badge badge-ghost badge-sm">NFT 集合</span>
+          )}
+          {a.kind === 'permit2' && (
+            <span className="badge badge-info badge-sm">Permit2</span>
           )}
         </div>
         <AddrLink addr={a.token} />
@@ -241,6 +270,9 @@ function ApprovalRow({ a, canRevoke }: { a: Approval; canRevoke: boolean }) {
           <span className="badge badge-error badge-sm">无限</span>
         ) : (
           <span className="font-mono text-sm">{a.amountText}</span>
+        )}
+        {a.kind === 'permit2' && (
+          <div className="text-xs text-base-content/50">{expiryText(a.expiration)}</div>
         )}
       </td>
       <td className="text-right">
@@ -275,6 +307,12 @@ function AddrLink({ addr }: { addr: string }) {
       {addr.slice(0, 8)}…{addr.slice(-6)}
     </a>
   );
+}
+
+function expiryText(exp: number): string {
+  const FAR = 32503680000; // ~ 公元 3000 年，视为永久
+  if (exp > FAR) return '永久';
+  return `到期 ${new Date(exp * 1000).toLocaleDateString('zh-CN')}`;
 }
 
 function shortError(e: Error): string {
