@@ -1,0 +1,54 @@
+'use client';
+
+import Link from 'next/link';
+import { ConnectButton } from '@rainbow-me/rainbowkit';
+
+export default function TxRayPage() {
+  return (
+    <main className="min-h-screen bg-base-100 px-6 py-16">
+      <div className="mx-auto max-w-3xl">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <Link
+              href="/"
+              className="text-sm text-base-content/60 hover:text-base-content"
+            >
+              ← 返回
+            </Link>
+            <h1 className="mt-2 text-4xl font-bold text-primary">TxRay</h1>
+            <p className="mt-2 text-base-content/80">
+              给链上操作拍 X 光片：看清授权、看懂交易。
+            </p>
+          </div>
+          <ConnectButton />
+        </div>
+
+        <div className="mt-10 grid gap-4 sm:grid-cols-2">
+          <Link
+            href="/tools/txray/approvals"
+            className="card bg-base-200 transition hover:bg-base-300"
+          >
+            <div className="card-body">
+              <h2 className="card-title">授权检查</h2>
+              <p className="text-sm text-base-content/70">
+                列出地址的代币授权，标记无限额度与未知合约，一键撤销。
+              </p>
+            </div>
+          </Link>
+
+          <div className="card bg-base-200 opacity-60">
+            <div className="card-body">
+              <h2 className="card-title">
+                交易解码
+                <span className="badge badge-ghost badge-sm">敬请期待</span>
+              </h2>
+              <p className="text-sm text-base-content/70">
+                粘贴 calldata 或 tx hash，用人话解释这笔交易在干什么。
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  );
+}
