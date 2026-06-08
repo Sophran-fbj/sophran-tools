@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
   useAccount,
@@ -13,7 +13,10 @@ import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { erc20Abi, erc721Abi, isAddress, type Address } from 'viem';
 import { normalize } from 'viem/ens';
 import { useApprovals, type Approval } from '@/features/txray/approvals/useApprovals';
-import { getSpenderLabel } from '@/features/txray/approvals/spenderLabels';
+import {
+  useSpenderRisk,
+  type SpenderRisk,
+} from '@/features/txray/approvals/useSpenderRisk';
 import { PERMIT2_ADDRESS, permit2Abi } from '@/features/txray/approvals/permit2';
 
 export default function ApprovalsPage() {
@@ -41,6 +44,13 @@ export default function ApprovalsPage() {
   }
 
   const { data: approvals, isLoading, isError, error } = useApprovals(target, 1);
+
+  // 唯一 spender 列表 → 风险画像
+  const spenders = useMemo(
+    () => (approvals ? Array.from(new Set(approvals.map((a) => a.spender))) : []),
+    [approvals],
+  );
+  const { data: riskMap } = useSpenderRisk(spenders, 1);
 
   const canRevoke =
     !!connected && !!target && connected.toLowerCase() === target.toLowerCase();
@@ -176,14 +186,19 @@ export default function ApprovalsPage() {
                     <thead>
                       <tr>
                         <th>资产</th>
-                        <th>被授权方</th>
+                        <th>被授权方 / 风险</th>
                         <th className="text-right">当前额度</th>
                         <th className="text-right">操作</th>
                       </tr>
                     </thead>
                     <tbody>
                       {approvals.map((a) => (
-                        <ApprovalRow key={a.id} a={a} canRevoke={canRevoke} />
+                        <ApprovalRow
+                          key={a.id}
+                          a={a}
+                          canRevoke={canRevoke}
+                          risk={riskMap?.[a.spender.toLowerCase()]}
+                        />
                       ))}
                     </tbody>
                   </table>
@@ -201,7 +216,15 @@ export default function ApprovalsPage() {
   );
 }
 
-function ApprovalRow({ a, canRevoke }: { a: Approval; canRevoke: boolean }) {
+function ApprovalRow({
+  a,
+  canRevoke,
+  risk,
+}: {
+  a: Approval;
+  canRevoke: boolean;
+  risk?: SpenderRisk;
+}) {
   const queryClient = useQueryClient();
   const { writeContract, data: hash, isPending, error: writeError } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
@@ -226,7 +249,6 @@ function ApprovalRow({ a, canRevoke }: { a: Approval; canRevoke: boolean }) {
         args: [a.spender, false],
       });
     } else {
-      // permit2：在 Permit2 合约上把额度置 0
       writeContract({
         address: PERMIT2_ADDRESS,
         abi: permit2Abi,
@@ -236,7 +258,6 @@ function ApprovalRow({ a, canRevoke }: { a: Approval; canRevoke: boolean }) {
     }
   };
 
-  const label = getSpenderLabel(a.spender);
   const busy = isPending || isConfirming;
 
   return (
@@ -254,14 +275,11 @@ function ApprovalRow({ a, canRevoke }: { a: Approval; canRevoke: boolean }) {
         <AddrLink addr={a.token} />
       </td>
       <td>
-        <div className="flex items-center gap-2">
-          {label ? (
-            <span className="badge badge-success badge-sm">{label.name}</span>
-          ) : (
-            <span className="badge badge-warning badge-sm">未知合约</span>
-          )}
-        </div>
+        <RiskBadge risk={risk} spender={a.spender} />
         <AddrLink addr={a.spender} />
+        {risk && risk.level !== 'known' && (
+          <div className="mt-0.5 text-xs text-base-content/50">{risk.reason}</div>
+        )}
       </td>
       <td className="text-right">
         {a.kind === 'nft' ? (
@@ -294,6 +312,25 @@ function ApprovalRow({ a, canRevoke }: { a: Approval; canRevoke: boolean }) {
       </td>
     </tr>
   );
+}
+
+function RiskBadge({ risk, spender }: { risk?: SpenderRisk; spender: string }) {
+  if (!risk) {
+    // 风险数据加载中：先用标签兜底
+    return <span className="badge badge-ghost badge-sm">分析中…</span>;
+  }
+  switch (risk.level) {
+    case 'malicious':
+      return <span className="badge badge-error badge-sm">⚠ 已知恶意</span>;
+    case 'eoa':
+      return <span className="badge badge-error badge-sm">⚠ 非合约(EOA)</span>;
+    case 'new':
+      return <span className="badge badge-warning badge-sm">新合约</span>;
+    case 'known':
+      return <span className="badge badge-success badge-sm">{risk.labelName}</span>;
+    default:
+      return <span className="badge badge-warning badge-sm">未知合约</span>;
+  }
 }
 
 function AddrLink({ addr }: { addr: string }) {
