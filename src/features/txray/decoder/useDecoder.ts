@@ -73,7 +73,7 @@ async function decode(client: PublicClient, value: string): Promise<DecodedResul
 
   const selector = calldata.slice(0, 10).toLowerCase();
   const known = KNOWN_SIGNATURES[selector];
-  let signature = known?.signature ?? null;
+  let signature: string | null = known?.signature ?? null;
 
   // 本地没命中 → 服务端反查 openchain
   if (!signature) {

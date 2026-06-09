@@ -275,7 +275,7 @@ function ApprovalRow({
         <AddrLink addr={a.token} />
       </td>
       <td>
-        <RiskBadge risk={risk} spender={a.spender} />
+        <RiskBadge risk={risk} />
         <AddrLink addr={a.spender} />
         {risk && risk.level !== 'known' && (
           <div className="mt-0.5 text-xs text-base-content/50">{risk.reason}</div>
@@ -314,7 +314,7 @@ function ApprovalRow({
   );
 }
 
-function RiskBadge({ risk, spender }: { risk?: SpenderRisk; spender: string }) {
+function RiskBadge({ risk }: { risk?: SpenderRisk }) {
   if (!risk) {
     // 风险数据加载中：先用标签兜底
     return <span className="badge badge-ghost badge-sm">分析中…</span>;

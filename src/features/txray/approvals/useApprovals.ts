@@ -142,7 +142,7 @@ async function fetchApprovals(
 
   const liveNft = nftPairs.filter((_, i) => {
     const r = nftApproved[i];
-    return r?.status === 'success' && r.result === true;
+    return r?.status === 'success' && Boolean(r.result);
   });
 
   const now = Math.floor(Date.now() / 1000);

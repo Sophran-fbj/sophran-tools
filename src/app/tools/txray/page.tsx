@@ -23,7 +23,7 @@ export default function TxRayPage() {
           <ConnectButton />
         </div>
 
-        <div className="mt-10 grid gap-4 sm:grid-cols-2">
+        <div className="mt-10 grid gap-4 sm:grid-cols-3">
           <Link
             href="/tools/txray/approvals"
             className="card bg-base-200 transition hover:bg-base-300"
@@ -44,6 +44,18 @@ export default function TxRayPage() {
               <h2 className="card-title">交易解码</h2>
               <p className="text-sm text-base-content/70">
                 粘贴 calldata 或 tx hash，用人话解释这笔交易在干什么。
+              </p>
+            </div>
+          </Link>
+
+          <Link
+            href="/tools/txray/signature"
+            className="card bg-base-200 transition hover:bg-base-300"
+          >
+            <div className="card-body">
+              <h2 className="card-title">签名解码</h2>
+              <p className="text-sm text-base-content/70">
+                粘贴 EIP-712 typed data，识别 permit、Permit2 和订单签名风险。
               </p>
             </div>
           </Link>
