@@ -1,9 +1,25 @@
 import { isAddress, type Address } from 'viem';
 
 export type SignatureDanger = 'high' | 'medium' | 'low' | 'unknown';
+export type SignatureFindingKind =
+  | 'spender'
+  | 'operator'
+  | 'conduit'
+  | 'token'
+  | 'owner'
+  | 'amount'
+  | 'nonce'
+  | 'deadline';
+export type SignatureRiskKind =
+  | 'unknown'
+  | 'permit2'
+  | 'erc20-permit'
+  | 'nft-order'
+  | 'operator';
 
 export interface FieldFinding {
   label: string;
+  kind: SignatureFindingKind;
   value: string;
   severity: SignatureDanger;
   explain: string;
@@ -14,6 +30,7 @@ export interface SignatureAnalysis {
   verifyingContract?: Address;
   primaryType?: string;
   danger: SignatureDanger;
+  riskKind: SignatureRiskKind;
   title: string;
   explain: string;
   findings: FieldFinding[];
@@ -59,6 +76,7 @@ export function analyzeTypedData(input: string): SignatureAnalysis {
   if (nonce !== undefined) {
     findings.push({
       label: 'Nonce',
+      kind: 'nonce',
       value: stringifyValue(nonce),
       severity: 'low',
       explain: 'Nonce prevents replay of the same signature.',
@@ -81,27 +99,32 @@ export function analyzeTypedData(input: string): SignatureAnalysis {
   );
 
   let danger: SignatureDanger = 'unknown';
+  let riskKind: SignatureRiskKind = 'unknown';
   let title = 'Unknown typed-data signature';
   let explain =
     'TxRay cannot confidently classify this typed-data payload. Review every address, amount, and deadline before signing.';
 
   if (permitKind === 'permit2') {
     danger = hasUnlimited || hasSpender ? 'high' : 'medium';
+    riskKind = 'permit2';
     title = 'Permit2 token spending approval';
     explain =
       'This signature can grant a spender permission through Uniswap Permit2. It may move tokens later without a separate approval transaction.';
   } else if (permitKind === 'erc20-permit') {
     danger = hasUnlimited || hasSpender ? 'high' : 'medium';
+    riskKind = 'erc20-permit';
     title = 'ERC-20 permit approval';
     explain =
       'This signature can approve token spending without sending an on-chain approve transaction first.';
   } else if (permitKind === 'nft-order') {
     danger = 'high';
+    riskKind = 'nft-order';
     title = 'NFT or order signature';
     explain =
       'This looks like an order-style signature. Signing can authorize a marketplace or conduit to move NFTs or settle an order.';
   } else if (hasOperator) {
     danger = 'high';
+    riskKind = 'operator';
     title = 'Operator authorization';
     explain =
       'This signature names an operator. Operators can be dangerous because they may act on assets after the signature is accepted.';
@@ -114,6 +137,7 @@ export function analyzeTypedData(input: string): SignatureAnalysis {
     verifyingContract,
     primaryType,
     danger,
+    riskKind,
     title,
     explain,
     findings,
@@ -219,6 +243,7 @@ function collectAddressFinding(
 
   findings.push({
     label,
+    kind: label.toLowerCase() as SignatureFindingKind,
     value: addr,
     severity: label === 'Owner' ? 'low' : 'medium',
     explain:
@@ -233,6 +258,7 @@ function amountFinding(value: unknown): FieldFinding {
   const isUnlimited = text === MAX_UINT256;
   return {
     label: 'Amount',
+    kind: 'amount',
     value: isUnlimited ? 'Unlimited (max uint256)' : text,
     severity: isUnlimited ? 'high' : 'medium',
     explain: isUnlimited
@@ -247,6 +273,7 @@ function deadlineFinding(value: unknown): FieldFinding {
   if (!Number.isFinite(num) || num <= 0) {
     return {
       label: 'Deadline',
+      kind: 'deadline',
       value: text,
       severity: 'medium',
       explain: 'The deadline is missing or cannot be interpreted safely.',
@@ -259,6 +286,7 @@ function deadlineFinding(value: unknown): FieldFinding {
 
   return {
     label: 'Deadline',
+    kind: 'deadline',
     value: `${new Date(num * 1000).toLocaleString()} (${days} days)`,
     severity: farFuture ? 'medium' : 'low',
     explain: farFuture

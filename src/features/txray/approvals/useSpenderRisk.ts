@@ -22,6 +22,48 @@ const BLOCKLIST = new Set<string>([
 
 const NEW_CONTRACT_DAYS = 30;
 
+export function classifySpenderRisk(input: {
+  address: Address;
+  isEoa: boolean;
+  createdAt?: number;
+  now: number;
+}): SpenderRisk {
+  const address = input.address.toLowerCase();
+  const label = getSpenderLabel(input.address);
+
+  let level: RiskLevel;
+  let reason: string;
+
+  if (BLOCKLIST.has(address)) {
+    level = 'malicious';
+    reason = '已知恶意地址，建议立即撤销';
+  } else if (input.isEoa) {
+    level = 'eoa';
+    reason = '被授权方是普通钱包（无合约代码）——正常 dApp 不会这样，极可能是钓鱼';
+  } else if (label?.trusted) {
+    level = 'known';
+    reason = label.name;
+  } else if (
+    input.createdAt &&
+    input.now - input.createdAt < NEW_CONTRACT_DAYS * 86400
+  ) {
+    const days = Math.max(0, Math.floor((input.now - input.createdAt) / 86400));
+    level = 'new';
+    reason = `合约仅 ${days} 天前部署，谨慎对待`;
+  } else {
+    level = 'unknown';
+    reason = '未在已知名单中，请自行核实';
+  }
+
+  return {
+    level,
+    labelName: label?.name,
+    isEoa: input.isEoa,
+    createdAt: input.createdAt,
+    reason,
+  };
+}
+
 export function useSpenderRisk(spenders: Address[], chainId = 1) {
   const client = usePublicClient({ chainId });
   const key = [...new Set(spenders.map((s) => s.toLowerCase()))].sort().join(',');
@@ -67,32 +109,9 @@ async function fetchSpenderRisk(
   const now = Math.floor(Date.now() / 1000);
   const out: Record<string, SpenderRisk> = {};
   for (const a of unique) {
-    const label = getSpenderLabel(a);
     const eoa = isEoa[a];
     const createdAt = createdMap[a] ?? undefined;
-
-    let level: RiskLevel;
-    let reason: string;
-
-    if (BLOCKLIST.has(a)) {
-      level = 'malicious';
-      reason = '已知恶意地址，建议立即撤销';
-    } else if (eoa) {
-      level = 'eoa';
-      reason = '被授权方是普通钱包（无合约代码）——正常 dApp 不会这样，极可能是钓鱼';
-    } else if (label?.trusted) {
-      level = 'known';
-      reason = label.name;
-    } else if (createdAt && now - createdAt < NEW_CONTRACT_DAYS * 86400) {
-      const days = Math.max(0, Math.floor((now - createdAt) / 86400));
-      level = 'new';
-      reason = `合约仅 ${days} 天前部署，谨慎对待`;
-    } else {
-      level = 'unknown';
-      reason = '未在已知名单中，请自行核实';
-    }
-
-    out[a] = { level, labelName: label?.name, isEoa: eoa, createdAt, reason };
+    out[a] = classifySpenderRisk({ address: a, isEoa: eoa, createdAt, now });
   }
   return out;
 }
