@@ -1,93 +1,161 @@
 # web3-toolbench
 
-> 一个边检查链上风险、边用中文讲清原理的 web3 工具站。
-> *A web3 toolbench that not only flags on-chain risks, but explains the why.*
+**语言:** 中文 | [English](./README.en.md)
 
-个人 web3 工具站。第一个工具是 **TxRay**——给你的链上操作"拍 X 光片":看清你授权了谁、一笔交易到底在干什么。
+> 一个不只检测链上风险，也解释风险原因的 web3 工具站。
 
-## 为什么又一个工具站？
+`web3-toolbench` 是一个个人 web3 工具站。当前第一个工具是 **TxRay**，用于帮助 EVM 用户检查授权、解码交易、分析签名风险。
 
-现有工具（如 revoke.cash）只**显示**风险，web3-toolbench 还**解释**风险:每个高危点都配一句人话说明，并链到深度文章。**显示 + 解释**,让普通用户真正看懂自己面临什么——这是它和同类工具的区别。
+TxRay 关注真实的用户安全场景：钱包连接、索引化链上数据、RPC 读取、multicall、calldata 解码、Permit2 授权分析、EIP-712 typed data 检查，以及面向用户的人话解释。
 
-## 工具
+## 为什么做这个项目
 
-### TxRay · 授权检查 (V1)
-- 连钱包或粘贴任意地址，列出全部 ERC-20 / 721 / 1155 授权
-- 无限额度、未知合约高亮标记
-- 一键撤销
-- 每条授权配风险解释
+很多钱包和浏览器工具会给出原始警告，但用户经常仍然看不懂自己到底授权了什么、签了什么。
 
-### TxRay · 交易解码 (V2)
-- 粘贴 calldata 或交易 hash，解码出在调用什么、参数是什么
-- 危险模式（`approve` / `permit` / `setApprovalForAll` 等）重点标注
-- 用人话翻译"这笔交易意味着什么"
+TxRay 的核心是 **检测 + 解释**：
 
-> 状态：开发中（M1 进行中，见 [Roadmap](#roadmap)）。
+- 检测高风险代币授权和 Permit2 授权。
+- 解码 calldata 和常见危险函数选择器。
+- 在用户签名前检查 EIP-712 typed data。
+- 用人话解释风险，并把风险点链接到对应的原理文章。
+
+## 当前功能
+
+### TxRay · 授权检查
+
+- 通过服务端 Etherscan 索引器路由读取 ERC-20、ERC-721 和 Permit2 授权历史。
+- 用 viem multicall 校验当前授权额度，过滤已经失效的历史授权。
+- 检测 ERC-20 无限授权。
+- 检测 NFT `setApprovalForAll` 整集合授权。
+- 检查 Uniswap Permit2 内部授权，而不只看表层的 ERC-20 approve。
+- 识别 spender 风险：
+  - 已知可信合约；
+  - EOA spender；
+  - 新部署的未知合约；
+  - 未知合约；
+  - 可持续补充的恶意地址黑名单。
+- 通过已连接钱包撤销 ERC-20、NFT 和 Permit2 授权。
+- 演示模式：`/tools/txray/approvals?demo=1`。
+
+### TxRay · 交易解码
+
+- 直接解码 calldata。
+- 通过交易 hash 拉取 transaction input 并解码。
+- 识别 `approve`、`setApprovalForAll`、`permit`、`transferFrom`、`transfer` 等常见选择器。
+- 高亮高风险调用，并解释函数可能授权什么。
+- 未知选择器 fallback 到 OpenChain 签名库查询。
+
+### TxRay · EIP-712 签名解码
+
+- 粘贴钱包签名弹窗中的 typed-data JSON。
+- 识别 ERC-20 `permit`、Permit2 typed data 和订单类签名。
+- 抽取安全关键字段：
+  - spender / operator；
+  - token；
+  - amount；
+  - deadline / expiration；
+  - verifying contract；
+  - nonce。
+- 标记无限额度和长期有效签名。
+- 完全只读：不会要求钱包签署任何内容。
+
+### 原理文章
+
+- `/articles/why-unlimited-approval-is-dangerous`
+- `/articles/permit2-eip712-phishing`
+
+站点通过轻量本地 i18n provider 支持中文和英文切换。
 
 ## 技术栈
 
 | 层 | 选择 |
 |---|---|
-| 框架 | Next.js 16 (App Router) + TypeScript |
-| 链交互 | wagmi 2 + viem 2 |
+| 框架 | Next.js 16 App Router + React 19 |
+| 语言 | TypeScript |
 | 钱包 | RainbowKit 2 |
-| 样式 | Tailwind CSS 4 + DaisyUI 5 |
-| 数据 | TanStack Query（wagmi 内置） |
+| 链交互 | wagmi 2 + viem 2 |
+| 查询/缓存 | TanStack Query |
+| UI | Tailwind CSS 4 + DaisyUI 5 |
+| 测试 | Vitest |
 | 包管理 | pnpm |
-
-## 本地运行
-
-```bash
-pnpm install
-
-# 配置环境变量
-cp .env.local.example .env.local   # 然后填入下面的 key
-
-pnpm dev   # http://localhost:3000
-```
-
-### 环境变量
-
-| 变量 | 用途 | 获取 |
-|---|---|---|
-| `NEXT_PUBLIC_WC_PROJECT_ID` | 钱包连接（RainbowKit 必需） | [cloud.reown.com](https://cloud.reown.com) |
-| `NEXT_PUBLIC_ALCHEMY_ID` | RPC 节点 | [alchemy.com](https://alchemy.com) |
-| `ETHERSCAN_API_KEY` | 授权历史查询 | [etherscan.io/apis](https://etherscan.io/apis) |
 
 ## 架构
 
-单个 Next.js 应用，工具以路由形式存在，互不耦合:
+单个 Next.js 应用。工具以路由形式存在，业务逻辑放在 `src/features` 下。
 
-```
+```text
 src/
-├─ app/tools/txray/     # 工具 = 路由
-├─ features/            # 业务逻辑（按工具分，互不 import）
-├─ lib/web3/            # 共享链层（wagmi/viem/multicall）
-└─ components/          # 共享 UI
+├─ app/
+│  ├─ tools/txray/          # TxRay 路由
+│  ├─ articles/             # 原理文章
+│  └─ api/                  # 服务端索引器/签名辅助路由
+├─ components/              # 共享 UI 组件
+├─ content/articles.ts      # 轻量文章内容注册表
+├─ features/txray/          # 授权、交易解码、签名分析逻辑
+└─ lib/
+   ├─ i18n/                 # 本地双语文本 provider
+   └─ web3/                 # wagmi / viem 配置
 ```
 
-详见 [`docs/技术与架构选型.md`](./docs/技术与架构选型.md) 与 [`docs/需求文档.md`](./docs/需求文档.md)。
+当前刻意不使用 monorepo。项目只有一个可部署应用，常规项目内 import 已足够。等出现需要独立部署的第二个应用时，再升级成 workspace。
 
-## 安全与隐私
+## 数据流
 
-这是一个安全工具，因此自身严守:
+| 数据 | 运行位置 | 原因 |
+|---|---|---|
+| 授权历史 | 服务端路由 -> Etherscan 索引器 | 免费 RPC 全历史 `eth_getLogs` 不现实。 |
+| 当前额度 / 元数据 | 浏览器 -> viem multicall | 读取实时链上状态，不需要自有服务端状态。 |
+| spender 创建信息 | 服务端路由 -> Etherscan | API key 留在服务端。 |
+| calldata 解码 | 浏览器 + 签名查询路由 | 本地选择器表优先，未知再查 OpenChain。 |
+| EIP-712 分析 | 浏览器本地 | 纯 JSON 检查，不需要 RPC，也不需要签名。 |
 
-- **永不接触私钥/助记词**——所有写操作由用户钱包签名。
-- **不收集用户数据**——不向自有服务器上传地址，查询直连公开 RPC/API。
-- **绝不索要助记词或私钥**。
+## 安全姿态
 
-## 技术取舍（诚实说明）
+- 永不索要助记词或私钥。
+- 默认都是只读分析。
+- 写操作只限于用户通过钱包主动发起的撤销交易。
+- Etherscan API key 保留在服务端。
+- WalletConnect 和 Alchemy public key 属于前端 key，应在供应商后台配置域名限制。
 
-- **授权历史用 API 而非纯 RPC**:纯 `getLogs` 查全历史受区块范围限制、慢且易超时；MVP 用 Etherscan/Alchemy API 保证完整与速度。
-- **wagmi 固定 v2**:RainbowKit 等钱包 UI 生态尚未支持 wagmi 3，v2 是当前稳定主流。
+## 本地开发
 
-## Roadmap
+```bash
+pnpm install
+cp .env.example .env.local
+pnpm dev
+```
 
-- [ ] **M1** 钱包连接 + 主网 ERC-20 授权列表
-- [ ] **M2** 风险标记 + spender 标签 + 一键撤销
-- [ ] **M3** 交易解码器（calldata + tx hash）
-- [ ] **M4** 人话解释层 + 危险模式高亮 + 文章联动
-- [ ] **M5** 多链扩展（Base / Arbitrum / OP / Polygon）+ 上线
+需要的环境变量：
+
+| 变量 | 用途 |
+|---|---|
+| `NEXT_PUBLIC_WC_PROJECT_ID` | Reown / WalletConnect Project ID，用于 RainbowKit |
+| `NEXT_PUBLIC_ALCHEMY_ID` | Alchemy RPC key |
+| `ETHERSCAN_API_KEY` | Etherscan V2 API key，服务端路由使用 |
+| `DEV_PROXY` | 可选，本地开发时让服务端 fetch 走 HTTP/混合代理 |
+
+`DEV_PROXY` 示例：
+
+```env
+DEV_PROXY=http://127.0.0.1:10808
+```
+
+## 验证
+
+```bash
+pnpm lint
+pnpm exec tsc --noEmit
+pnpm test
+pnpm build
+```
+
+## 后续方向
+
+- 补充更多真实 spender 标签和公开 drainer/blocklist 数据源。
+- 增加多链授权检查。
+- 增加 `$ at risk` 风险金额估算。
+- 内容增长后，将文章系统升级为 MDX。
+- 公开部署后补充线上地址。
 
 ## License
 
