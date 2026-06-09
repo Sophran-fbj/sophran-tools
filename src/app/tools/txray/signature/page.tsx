@@ -2,12 +2,15 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { ConnectButton } from '@rainbow-me/rainbowkit';
+import { LanguageToggle } from '@/components/LanguageToggle';
+import { WalletButton } from '@/components/WalletButton';
+import { useI18n } from '@/lib/i18n/provider';
 import {
   analyzeTypedData,
   type FieldFinding,
   type SignatureAnalysis,
   type SignatureDanger,
+  type SignatureRiskKind,
 } from '@/features/txray/signature/analyzer';
 
 const EXAMPLE_PERMIT = JSON.stringify(
@@ -84,6 +87,7 @@ const EXAMPLE_PERMIT2 = JSON.stringify(
 );
 
 export default function SignaturePage() {
+  const { t } = useI18n();
   const [input, setInput] = useState('');
 
   const result = useMemo<
@@ -99,10 +103,10 @@ export default function SignaturePage() {
     } catch (e) {
       return {
         status: 'error',
-        error: e instanceof Error ? e.message : 'Failed to analyze signature.',
+        error: e instanceof Error ? e.message : t.signature.failed,
       };
     }
-  }, [input]);
+  }, [input, t.signature.failed]);
 
   return (
     <main className="min-h-screen bg-base-100 px-6 py-12">
@@ -116,45 +120,42 @@ export default function SignaturePage() {
               ← TxRay
             </Link>
             <h1 className="mt-2 text-3xl font-bold text-primary">
-              Signature decoder
+              {t.signature.title}
             </h1>
-            <p className="mt-1 text-sm text-base-content/60">
-              Paste EIP-712 typed data and inspect what a signature can authorize.
-            </p>
+            <p className="mt-1 text-sm text-base-content/60">{t.signature.desc}</p>
           </div>
-          <ConnectButton />
+          <div className="flex items-center gap-3">
+            <LanguageToggle />
+            <WalletButton />
+          </div>
         </div>
 
         <div className="alert alert-warning mt-8 text-sm">
-          <span>
-            This is read-only analysis. TxRay will never ask you to sign the
-            pasted payload. Treat unknown signature requests as hostile until you
-            understand the spender, amount, and deadline.
-          </span>
+          <span>{t.signature.readonly}</span>
         </div>
 
         <div className="form-control mt-6">
           <label className="label">
-            <span className="label-text">Typed-data JSON</span>
+            <span className="label-text">{t.signature.inputLabel}</span>
             <span className="flex gap-2">
               <button
                 className="link link-primary text-xs"
                 onClick={() => setInput(EXAMPLE_PERMIT)}
               >
-                ERC-20 permit sample
+                {t.signature.permitSample}
               </button>
               <button
                 className="link link-secondary text-xs"
                 onClick={() => setInput(EXAMPLE_PERMIT2)}
               >
-                Permit2 sample
+                {t.signature.permit2Sample}
               </button>
             </span>
           </label>
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder='{"domain":{...},"primaryType":"Permit","message":{...},"types":{...}}'
+            placeholder={t.signature.placeholder}
             className="textarea textarea-bordered min-h-72 w-full break-all font-mono text-xs"
             spellCheck={false}
           />
@@ -164,8 +165,7 @@ export default function SignaturePage() {
           {result.status === 'idle' && (
             <div className="card bg-base-200">
               <div className="card-body text-sm text-base-content/60">
-                Paste a signTypedData payload, or click a sample to see how TxRay
-                explains risky approvals.
+                {t.signature.idle}
               </div>
             </div>
           )}
@@ -180,41 +180,42 @@ export default function SignaturePage() {
 }
 
 function AnalysisView({ data }: { data: SignatureAnalysis }) {
+  const { t } = useI18n();
+
   return (
     <div className="space-y-4">
       <div className={`alert ${dangerClass(data.danger)}`}>
         <div>
-          <div className="font-bold">{data.title}</div>
-          <div className="text-sm">{data.explain}</div>
+          <div className="font-bold">{riskTitle(t, data.riskKind)}</div>
+          <div className="text-sm">{riskExplain(t, data.riskKind)}</div>
         </div>
       </div>
 
       <div className="grid gap-3 md:grid-cols-3">
-        <InfoCard label="Domain" value={data.domainName ?? 'Unknown'} />
-        <InfoCard label="Primary type" value={data.primaryType ?? 'Unknown'} />
+        <InfoCard label={t.signature.domain} value={data.domainName ?? t.signature.unknown} />
+        <InfoCard label={t.signature.primaryType} value={data.primaryType ?? t.signature.unknown} />
         <InfoCard
-          label="Verifying contract"
-          value={data.verifyingContract ?? 'Not provided'}
+          label={t.signature.verifyingContract}
+          value={data.verifyingContract ?? t.signature.notProvided}
           mono
         />
       </div>
 
       <div className="card bg-base-200">
         <div className="card-body">
-          <h2 className="card-title text-lg">Security-relevant fields</h2>
+          <h2 className="card-title text-lg">{t.signature.fields}</h2>
           {data.findings.length === 0 ? (
             <p className="text-sm text-base-content/60">
-              No common permit or operator fields were detected. Inspect the raw
-              message before signing.
+              {t.signature.noFields}
             </p>
           ) : (
             <div className="overflow-x-auto">
               <table className="table table-sm">
                 <thead>
                   <tr>
-                    <th>Field</th>
-                    <th>Value</th>
-                    <th>Why it matters</th>
+                    <th>{t.signature.field}</th>
+                    <th>{t.signature.value}</th>
+                    <th>{t.signature.why}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -230,7 +231,7 @@ function AnalysisView({ data }: { data: SignatureAnalysis }) {
 
       <details className="collapse-arrow collapse bg-base-200">
         <summary className="collapse-title text-sm text-base-content/70">
-          Raw message
+          {t.signature.rawMessage}
         </summary>
         <div className="collapse-content">
           <pre className="overflow-x-auto whitespace-pre-wrap break-all font-mono text-xs text-base-content/60">
@@ -243,15 +244,25 @@ function AnalysisView({ data }: { data: SignatureAnalysis }) {
 }
 
 function FindingRow({ finding }: { finding: FieldFinding }) {
+  const { locale, t } = useI18n();
+
   return (
     <tr>
       <td>
         <span className={`badge badge-sm ${badgeClass(finding.severity)}`}>
-          {finding.label}
+          {t.signature.findingLabels[finding.kind]}
         </span>
       </td>
       <td className="max-w-sm break-all font-mono text-xs">{finding.value}</td>
-      <td className="text-sm text-base-content/70">{finding.explain}</td>
+      <td className="text-sm text-base-content/70">
+        {finding.kind === 'amount' && finding.severity === 'high'
+          ? `${t.signature.findingExplains.amount} ${
+              locale === 'zh'
+                ? '无限额度意味着 spender 可能在授权有效期内移动全部余额。'
+                : 'Unlimited amount means the spender may move the full balance while the approval remains valid.'
+            }`
+          : t.signature.findingExplains[finding.kind]}
+      </td>
     </tr>
   );
 }
@@ -287,4 +298,16 @@ function badgeClass(danger: SignatureDanger): string {
   if (danger === 'medium') return 'badge-warning';
   if (danger === 'low') return 'badge-info';
   return 'badge-ghost';
+}
+
+function riskTitle(t: ReturnType<typeof useI18n>['t'], kind: SignatureRiskKind) {
+  if (kind === 'erc20-permit') return t.signature.riskTitles.erc20Permit;
+  if (kind === 'nft-order') return t.signature.riskTitles.nftOrder;
+  return t.signature.riskTitles[kind];
+}
+
+function riskExplain(t: ReturnType<typeof useI18n>['t'], kind: SignatureRiskKind) {
+  if (kind === 'erc20-permit') return t.signature.riskExplains.erc20Permit;
+  if (kind === 'nft-order') return t.signature.riskExplains.nftOrder;
+  return t.signature.riskExplains[kind];
 }

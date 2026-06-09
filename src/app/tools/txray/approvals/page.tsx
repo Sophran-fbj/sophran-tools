@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import {
   useAccount,
   useEnsAddress,
@@ -9,7 +10,6 @@ import {
   useWaitForTransactionReceipt,
 } from 'wagmi';
 import { useQueryClient } from '@tanstack/react-query';
-import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { erc20Abi, erc721Abi, isAddress, type Address } from 'viem';
 import { normalize } from 'viem/ens';
 import { useApprovals, type Approval } from '@/features/txray/approvals/useApprovals';
@@ -18,8 +18,37 @@ import {
   type SpenderRisk,
 } from '@/features/txray/approvals/useSpenderRisk';
 import { PERMIT2_ADDRESS, permit2Abi } from '@/features/txray/approvals/permit2';
+import {
+  DEMO_OWNER,
+  demoApprovals,
+  demoRiskMap,
+} from '@/features/txray/approvals/demoApprovals';
+import { WalletButton } from '@/components/WalletButton';
 
 export default function ApprovalsPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-screen bg-base-100 px-6 py-12">
+          <div className="mx-auto max-w-4xl">
+            <div className="card bg-base-200">
+              <div className="card-body items-center gap-3 text-base-content/60">
+                <span className="loading loading-spinner loading-md text-primary" />
+                <span>加载授权检查器…</span>
+              </div>
+            </div>
+          </div>
+        </main>
+      }
+    >
+      <ApprovalsContent />
+    </Suspense>
+  );
+}
+
+function ApprovalsContent() {
+  const searchParams = useSearchParams();
+  const demoMode = searchParams.get('demo') === '1';
   const { address: connected } = useAccount();
   const [input, setInput] = useState('');
 
@@ -40,20 +69,28 @@ export default function ApprovalsPage() {
     else if (looksLikeEns) target = ensResolved ?? undefined;
     else inputError = '请输入合法地址（0x…）或 ENS 域名（xxx.eth）';
   } else {
-    target = connected;
+    target = demoMode ? DEMO_OWNER : connected;
   }
 
-  const { data: approvals, isLoading, isError, error } = useApprovals(target, 1);
+  const approvalsQuery = useApprovals(demoMode ? undefined : target, 1);
+  const approvals = demoMode ? demoApprovals : approvalsQuery.data;
+  const isLoading = demoMode ? false : approvalsQuery.isLoading;
+  const isError = demoMode ? false : approvalsQuery.isError;
+  const error = approvalsQuery.error;
 
   // 唯一 spender 列表 → 风险画像
   const spenders = useMemo(
     () => (approvals ? Array.from(new Set(approvals.map((a) => a.spender))) : []),
     [approvals],
   );
-  const { data: riskMap } = useSpenderRisk(spenders, 1);
+  const { data: liveRiskMap } = useSpenderRisk(demoMode ? [] : spenders, 1);
+  const riskMap = demoMode ? demoRiskMap : liveRiskMap;
 
   const canRevoke =
-    !!connected && !!target && connected.toLowerCase() === target.toLowerCase();
+    !demoMode &&
+    !!connected &&
+    !!target &&
+    connected.toLowerCase() === target.toLowerCase();
   const hasPermit2 = approvals?.some((a) => a.kind === 'permit2');
 
   return (
@@ -70,8 +107,17 @@ export default function ApprovalsPage() {
             <h1 className="mt-2 text-3xl font-bold text-primary">授权检查</h1>
             <p className="mt-1 text-sm text-base-content/60">仅查询以太坊主网</p>
           </div>
-          <ConnectButton />
+          <WalletButton />
         </div>
+
+        {demoMode && (
+          <div className="alert alert-info mt-6 text-sm">
+            <span>
+              演示模式：这里展示的是内置样例，不会读取链上数据，也不会发起撤销交易。
+              用它可以快速看出 TxRay 如何解释无限授权、Permit2 和 EOA spender 风险。
+            </span>
+          </div>
+        )}
 
         <div className="form-control mt-8">
           <label className="label">

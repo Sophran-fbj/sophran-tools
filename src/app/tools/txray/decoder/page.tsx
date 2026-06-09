@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { ConnectButton } from '@rainbow-me/rainbowkit';
+import { WalletButton } from '@/components/WalletButton';
 import {
   useDecoder,
   type DecodedParam,
@@ -37,7 +37,7 @@ export default function DecoderPage() {
               粘贴 calldata 或交易 hash，看清它在干什么
             </p>
           </div>
-          <ConnectButton />
+          <WalletButton />
         </div>
 
         <div className="form-control mt-8">
