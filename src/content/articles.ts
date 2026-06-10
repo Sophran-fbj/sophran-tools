@@ -117,7 +117,7 @@ export const articles: Article[] = [
       },
       {
         label: { zh: '解码 EIP-712 签名', en: 'Decode EIP-712 signatures' },
-        href: '/tools/txray/signature',
+        href: '/tools/signature-risk',
       },
     ],
     sections: [

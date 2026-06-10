@@ -28,6 +28,8 @@ TxRay 的核心是 **检测 + 解释**：
 - 检测 ERC-20 无限授权。
 - 检测 NFT `setApprovalForAll` 整集合授权。
 - 检查 Uniswap Permit2 内部授权，而不只看表层的 ERC-20 approve。
+- 支持 Ethereum、Base、Arbitrum、Optimism。
+- 估算 `$ at risk`：用 `min(当前余额, 授权额度)` 计算实际暴露数量，并尽量通过 CoinGecko 换算美元。
 - 识别 spender 风险：
   - 已知可信合约；
   - EOA spender；
@@ -45,7 +47,7 @@ TxRay 的核心是 **检测 + 解释**：
 - 高亮高风险调用，并解释函数可能授权什么。
 - 未知选择器 fallback 到 OpenChain 签名库查询。
 
-### TxRay · EIP-712 签名解码
+### Signature Risk · EIP-712 签名风险解释器
 
 - 粘贴钱包签名弹窗中的 typed-data JSON。
 - 识别 ERC-20 `permit`、Permit2 typed data 和订单类签名。
@@ -108,6 +110,7 @@ src/
 | spender 创建信息 | 服务端路由 -> Etherscan | API key 留在服务端。 |
 | calldata 解码 | 浏览器 + 签名查询路由 | 本地选择器表优先，未知再查 OpenChain。 |
 | EIP-712 分析 | 浏览器本地 | 纯 JSON 检查，不需要 RPC，也不需要签名。 |
+| Token 价格 | 浏览器 -> CoinGecko | 仅用于 `$ at risk` 估算，失败时回退到 token 数量。 |
 
 ## 安全姿态
 
@@ -152,8 +155,8 @@ pnpm build
 ## 后续方向
 
 - 补充更多真实 spender 标签和公开 drainer/blocklist 数据源。
-- 增加多链授权检查。
-- 增加 `$ at risk` 风险金额估算。
+- 在 Ethereum / Base / Arbitrum / Optimism 稳定后继续扩展更多链。
+- 改进 `$ at risk` 的缓存和价格覆盖。
 - 内容增长后，将文章系统升级为 MDX。
 - 公开部署后补充线上地址。
 

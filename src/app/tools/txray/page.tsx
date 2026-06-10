@@ -50,7 +50,7 @@ export default function TxRayPage() {
           </Link>
 
           <Link
-            href="/tools/txray/signature"
+            href="/tools/signature-risk"
             className="card bg-base-200 transition hover:bg-base-300"
           >
             <div className="card-body">
@@ -69,7 +69,7 @@ export default function TxRayPage() {
                 <Link href="/tools/txray/approvals?demo=1" className="btn btn-primary btn-sm">
                   {t.txray.openApprovalDemo}
                 </Link>
-                <Link href="/tools/txray/signature" className="btn btn-secondary btn-sm">
+                <Link href="/tools/signature-risk" className="btn btn-secondary btn-sm">
                   {t.txray.openSignatureDemo}
                 </Link>
               </div>

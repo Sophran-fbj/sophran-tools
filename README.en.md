@@ -28,6 +28,8 @@ TxRay focuses on **detect + explain**:
 - Detect unlimited ERC-20 allowances.
 - Detect NFT `setApprovalForAll` collection-level approvals.
 - Inspect Uniswap Permit2 internal allowances.
+- Support Ethereum, Base, Arbitrum, and Optimism.
+- Estimate `$ at risk` with `min(current balance, allowance)`, and convert it to USD through CoinGecko when pricing is available.
 - Classify spender risk:
   - known trusted contracts,
   - EOA spenders,
@@ -45,7 +47,7 @@ TxRay focuses on **detect + explain**:
 - Highlight high-risk calls and explain what the function can authorize.
 - Fallback to an OpenChain signature lookup for unknown selectors.
 
-### TxRay · EIP-712 Signature Decoder
+### Signature Risk · EIP-712 Signature Risk Explainer
 
 - Paste typed-data JSON from a wallet signing prompt.
 - Recognize ERC-20 `permit`, Permit2 typed data, and order-style signatures.
@@ -108,6 +110,7 @@ The project deliberately avoids monorepo complexity for now. There is only one d
 | Spender creation info | Server route -> Etherscan | Keeps API key server-side. |
 | Calldata decoding | Browser + signature lookup route | Local known selector map first, fallback to OpenChain. |
 | EIP-712 analysis | Browser only | Pure JSON inspection; no RPC or signing required. |
+| Token prices | Browser -> CoinGecko | Used only for `$ at risk`; falls back to token amount if pricing fails. |
 
 ## Security Posture
 
@@ -152,8 +155,8 @@ pnpm build
 ## Next Steps
 
 - Add more real spender labels and a public drainer/blocklist source.
-- Add multi-chain approval checks.
-- Add price-aware `$ at risk` estimation.
+- Add more chains after Ethereum / Base / Arbitrum / Optimism are stable.
+- Improve `$ at risk` caching and token price coverage.
 - Improve article authoring with MDX once content grows.
 - Deploy publicly and add the live URL here.
 

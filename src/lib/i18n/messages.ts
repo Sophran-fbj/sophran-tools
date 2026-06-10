@@ -18,6 +18,8 @@ export const messages = {
       txrayDesc:
         '授权检查 + 交易解码 + EIP-712 签名解码：检测 ERC-20 / NFT / Permit2 授权，标记 spender 风险，并解释危险原因。',
       txrayBadge: '可用',
+      signatureRiskTitle: 'Signature Risk',
+      signatureRiskDesc: 'EIP-712 签名风险解释器：识别 permit、Permit2 和订单签名风险。',
     },
     txray: {
       intro: '给链上操作拍 X 光片：看清授权、看懂交易、看懂签名。',
@@ -123,6 +125,9 @@ export const messages = {
       txrayDesc:
         'Approval check, transaction decoding, and EIP-712 signature decoding for ERC-20, NFT, and Permit2 risk analysis.',
       txrayBadge: 'Available',
+      signatureRiskTitle: 'Signature Risk',
+      signatureRiskDesc:
+        'An EIP-712 signature risk explainer for permit, Permit2, and order-style signatures.',
     },
     txray: {
       intro:

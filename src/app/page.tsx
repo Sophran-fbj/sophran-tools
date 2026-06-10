@@ -18,7 +18,7 @@ export default function Home() {
           <LanguageToggle />
         </div>
 
-        <div className="mt-10 grid gap-4">
+        <div className="mt-10 grid gap-4 md:grid-cols-2">
           <Link
             href="/tools/txray"
             className="card bg-base-200 transition hover:bg-base-300"
@@ -29,6 +29,20 @@ export default function Home() {
                 <span className="badge badge-primary badge-sm">{t.home.txrayBadge}</span>
               </h2>
               <p className="text-sm text-base-content/70">{t.home.txrayDesc}</p>
+            </div>
+          </Link>
+          <Link
+            href="/tools/signature-risk"
+            className="card bg-base-200 transition hover:bg-base-300"
+          >
+            <div className="card-body">
+              <h2 className="card-title">
+                {t.home.signatureRiskTitle}
+                <span className="badge badge-secondary badge-sm">{t.home.txrayBadge}</span>
+              </h2>
+              <p className="text-sm text-base-content/70">
+                {t.home.signatureRiskDesc}
+              </p>
             </div>
           </Link>
         </div>
