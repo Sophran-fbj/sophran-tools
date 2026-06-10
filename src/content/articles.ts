@@ -161,15 +161,15 @@ export const articles: Article[] = [
         ],
       },
       {
-        heading: { zh: 'TxRay 关注哪些字段', en: 'Fields TxRay Focuses On' },
+        heading: { zh: 'Signature Risk 关注哪些字段', en: 'Fields Signature Risk Focuses On' },
         body: [
           {
             zh: '签名前最重要的字段是 spender/operator、token、amount、deadline、verifyingContract。spender 决定谁能花钱，amount 决定能花多少，deadline 决定签名能活多久。',
             en: 'Before signing, the most important fields are spender/operator, token, amount, deadline, and verifyingContract.',
           },
           {
-            zh: 'TxRay 的签名解码器会把这些字段抽出来，并对 permit、Permit2、订单类签名做风险解释。它不会请求签名，只做本地只读分析。',
-            en: 'TxRay extracts these fields and explains permit, Permit2, and order-style signatures. It never asks the wallet to sign; analysis is local and read-only.',
+            zh: 'Signature Risk 会把这些字段抽出来，并对 permit、Permit2、订单类签名做风险解释。它不会请求签名，只做本地只读分析。',
+            en: 'Signature Risk extracts these fields and explains permit, Permit2, and order-style signatures. It never asks the wallet to sign; analysis is local and read-only.',
           },
         ],
       },

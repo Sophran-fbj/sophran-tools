@@ -26,7 +26,7 @@ export default function Home() {
             <div className="card-body">
               <h2 className="card-title">
                 TxRay
-                <span className="badge badge-primary badge-sm">{t.home.txrayBadge}</span>
+                <span className="badge badge-primary badge-sm">{t.common.available}</span>
               </h2>
               <p className="text-sm text-base-content/70">{t.home.txrayDesc}</p>
             </div>
@@ -38,7 +38,7 @@ export default function Home() {
             <div className="card-body">
               <h2 className="card-title">
                 {t.home.signatureRiskTitle}
-                <span className="badge badge-secondary badge-sm">{t.home.txrayBadge}</span>
+                <span className="badge badge-secondary badge-sm">{t.common.available}</span>
               </h2>
               <p className="text-sm text-base-content/70">
                 {t.home.signatureRiskDesc}

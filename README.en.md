@@ -4,9 +4,9 @@
 
 > Onchain utilities for safer web3 interactions.
 
-`sophran-tools` is a web3 tools site by Sophran. The first tool is **TxRay**, an approval, transaction, and signature risk assistant for EVM users.
+`sophran-tools` is a web3 tools site by Sophran. It currently includes **TxRay** and **Signature Risk**: TxRay checks approvals and decodes transactions, while Signature Risk analyzes EIP-712 signing risk.
 
-TxRay focuses on practical user safety: wallet connection, indexed chain data, RPC reads, multicall, calldata decoding, Permit2 allowance analysis, EIP-712 typed-data inspection, and plain-language risk explanation.
+These tools focus on practical user safety: wallet connection, indexed chain data, RPC reads, multicall, calldata decoding, Permit2 allowance analysis, EIP-712 typed-data inspection, and plain-language risk explanation.
 
 ## Why This Project Exists
 
@@ -16,7 +16,6 @@ TxRay focuses on **detect + explain**:
 
 - Detect risky token approvals and Permit2 allowances.
 - Decode calldata and common dangerous function selectors.
-- Inspect EIP-712 typed data before users sign it.
 - Explain risks in plain language and link each risk back to educational articles.
 
 ## Current Features

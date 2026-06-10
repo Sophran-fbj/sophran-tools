@@ -4,9 +4,9 @@
 
 > 一个不只检测链上风险，也解释风险原因的 web3 工具站。
 
-`sophran-tools` 是 Sophran 的 web3 工具站。当前第一个工具是 **TxRay**，用于帮助 EVM 用户检查授权、解码交易、分析签名风险。
+`sophran-tools` 是 Sophran 的 web3 工具站。当前包含 **TxRay** 和 **Signature Risk**：前者用于检查授权和解码交易，后者用于分析 EIP-712 签名风险。
 
-TxRay 关注真实的用户安全场景：钱包连接、索引化链上数据、RPC 读取、multicall、calldata 解码、Permit2 授权分析、EIP-712 typed data 检查，以及面向用户的人话解释。
+这些工具关注真实的用户安全场景：钱包连接、索引化链上数据、RPC 读取、multicall、calldata 解码、Permit2 授权分析、EIP-712 typed data 检查，以及面向用户的人话解释。
 
 ## 为什么做这个项目
 
@@ -16,7 +16,6 @@ TxRay 的核心是 **检测 + 解释**：
 
 - 检测高风险代币授权和 Permit2 授权。
 - 解码 calldata 和常见危险函数选择器。
-- 在用户签名前检查 EIP-712 typed data。
 - 用人话解释风险，并把风险点链接到对应的原理文章。
 
 ## 当前功能

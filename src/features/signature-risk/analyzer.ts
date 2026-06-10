@@ -102,7 +102,7 @@ export function analyzeTypedData(input: string): SignatureAnalysis {
   let riskKind: SignatureRiskKind = 'unknown';
   let title = 'Unknown typed-data signature';
   let explain =
-    'TxRay cannot confidently classify this typed-data payload. Review every address, amount, and deadline before signing.';
+    'Signature Risk cannot confidently classify this typed-data payload. Review every address, amount, and deadline before signing.';
 
   if (permitKind === 'permit2') {
     danger = hasUnlimited || hasSpender ? 'high' : 'medium';

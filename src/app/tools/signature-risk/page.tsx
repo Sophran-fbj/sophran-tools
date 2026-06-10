@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { LanguageToggle } from '@/components/LanguageToggle';
 import { WalletButton } from '@/components/WalletButton';
@@ -11,7 +11,7 @@ import {
   type SignatureAnalysis,
   type SignatureDanger,
   type SignatureRiskKind,
-} from '@/features/txray/signature/analyzer';
+} from '@/features/signature-risk/analyzer';
 
 const EXAMPLE_PERMIT = JSON.stringify(
   {
@@ -88,25 +88,34 @@ const EXAMPLE_PERMIT2 = JSON.stringify(
 
 export default function SignaturePage() {
   const { t } = useI18n();
+  const copy = t.signatureRisk;
   const [input, setInput] = useState('');
-
-  const result = useMemo<
+  const [result, setResult] = useState<
     | { status: 'idle' }
     | { status: 'ok'; data: SignatureAnalysis }
     | { status: 'error'; error: string }
-  >(() => {
-    const value = input.trim();
-    if (!value) return { status: 'idle' };
+  >({ status: 'idle' });
 
-    try {
-      return { status: 'ok', data: analyzeTypedData(value) };
-    } catch (e) {
-      return {
-        status: 'error',
-        error: e instanceof Error ? e.message : t.signature.failed,
-      };
+  function runAnalysis(value: string) {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      setResult({ status: 'idle' });
+      return;
     }
-  }, [input, t.signature.failed]);
+    try {
+      setResult({ status: 'ok', data: analyzeTypedData(trimmed) });
+    } catch (e) {
+      setResult({
+        status: 'error',
+        error: e instanceof Error ? e.message : copy.failed,
+      });
+    }
+  }
+
+  function loadSample(value: string) {
+    setInput(value);
+    runAnalysis(value);
+  }
 
   return (
     <main className="min-h-screen bg-base-100 px-6 py-12">
@@ -120,9 +129,9 @@ export default function SignaturePage() {
               ← {t.common.backHome}
             </Link>
             <h1 className="mt-2 text-3xl font-bold text-primary">
-              {t.signature.title}
+              {copy.title}
             </h1>
-            <p className="mt-1 text-sm text-base-content/60">{t.signature.desc}</p>
+            <p className="mt-1 text-sm text-base-content/60">{copy.desc}</p>
           </div>
           <div className="flex items-center gap-3">
             <LanguageToggle />
@@ -131,41 +140,55 @@ export default function SignaturePage() {
         </div>
 
         <div className="alert alert-warning mt-8 text-sm">
-          <span>{t.signature.readonly}</span>
+          <span>{copy.readonly}</span>
         </div>
 
         <div className="form-control mt-6">
           <label className="label">
-            <span className="label-text">{t.signature.inputLabel}</span>
+            <span className="label-text">{copy.inputLabel}</span>
             <span className="flex gap-2">
               <button
+                type="button"
                 className="link link-primary text-xs"
-                onClick={() => setInput(EXAMPLE_PERMIT)}
+                onClick={() => loadSample(EXAMPLE_PERMIT)}
               >
-                {t.signature.permitSample}
+                {copy.permitSample}
               </button>
               <button
+                type="button"
                 className="link link-secondary text-xs"
-                onClick={() => setInput(EXAMPLE_PERMIT2)}
+                onClick={() => loadSample(EXAMPLE_PERMIT2)}
               >
-                {t.signature.permit2Sample}
+                {copy.permit2Sample}
               </button>
             </span>
           </label>
           <textarea
             value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder={t.signature.placeholder}
+            onChange={(e) => {
+              setInput(e.target.value);
+              setResult({ status: 'idle' });
+            }}
+            placeholder={copy.placeholder}
             className="textarea textarea-bordered min-h-72 w-full break-all font-mono text-xs"
             spellCheck={false}
           />
+        </div>
+        <div className="mt-4 flex justify-end">
+          <button
+            type="button"
+            className="btn btn-primary btn-sm"
+            onClick={() => runAnalysis(input)}
+          >
+            {copy.analyze}
+          </button>
         </div>
 
         <div className="mt-6">
           {result.status === 'idle' && (
             <div className="card bg-base-200">
               <div className="card-body text-sm text-base-content/60">
-                {t.signature.idle}
+                {copy.idle}
               </div>
             </div>
           )}
@@ -181,6 +204,7 @@ export default function SignaturePage() {
 
 function AnalysisView({ data }: { data: SignatureAnalysis }) {
   const { t } = useI18n();
+  const copy = t.signatureRisk;
 
   return (
     <div className="space-y-4">
@@ -192,30 +216,30 @@ function AnalysisView({ data }: { data: SignatureAnalysis }) {
       </div>
 
       <div className="grid gap-3 md:grid-cols-3">
-        <InfoCard label={t.signature.domain} value={data.domainName ?? t.signature.unknown} />
-        <InfoCard label={t.signature.primaryType} value={data.primaryType ?? t.signature.unknown} />
+        <InfoCard label={copy.domain} value={data.domainName ?? copy.unknown} />
+        <InfoCard label={copy.primaryType} value={data.primaryType ?? copy.unknown} />
         <InfoCard
-          label={t.signature.verifyingContract}
-          value={data.verifyingContract ?? t.signature.notProvided}
+          label={copy.verifyingContract}
+          value={data.verifyingContract ?? copy.notProvided}
           mono
         />
       </div>
 
       <div className="card bg-base-200">
         <div className="card-body">
-          <h2 className="card-title text-lg">{t.signature.fields}</h2>
+          <h2 className="card-title text-lg">{copy.fields}</h2>
           {data.findings.length === 0 ? (
             <p className="text-sm text-base-content/60">
-              {t.signature.noFields}
+              {copy.noFields}
             </p>
           ) : (
             <div className="overflow-x-auto">
               <table className="table table-sm">
                 <thead>
                   <tr>
-                    <th>{t.signature.field}</th>
-                    <th>{t.signature.value}</th>
-                    <th>{t.signature.why}</th>
+                    <th>{copy.field}</th>
+                    <th>{copy.value}</th>
+                    <th>{copy.why}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -231,7 +255,7 @@ function AnalysisView({ data }: { data: SignatureAnalysis }) {
 
       <details className="collapse-arrow collapse bg-base-200">
         <summary className="collapse-title text-sm text-base-content/70">
-          {t.signature.rawMessage}
+          {copy.rawMessage}
         </summary>
         <div className="collapse-content">
           <pre className="overflow-x-auto whitespace-pre-wrap break-all font-mono text-xs text-base-content/60">
@@ -244,24 +268,21 @@ function AnalysisView({ data }: { data: SignatureAnalysis }) {
 }
 
 function FindingRow({ finding }: { finding: FieldFinding }) {
-  const { locale, t } = useI18n();
+  const { t } = useI18n();
+  const copy = t.signatureRisk;
 
   return (
     <tr>
       <td>
         <span className={`badge badge-sm ${badgeClass(finding.severity)}`}>
-          {t.signature.findingLabels[finding.kind]}
+          {copy.findingLabels[finding.kind]}
         </span>
       </td>
       <td className="max-w-sm break-all font-mono text-xs">{finding.value}</td>
       <td className="text-sm text-base-content/70">
         {finding.kind === 'amount' && finding.severity === 'high'
-          ? `${t.signature.findingExplains.amount} ${
-              locale === 'zh'
-                ? '无限额度意味着 spender 可能在授权有效期内移动全部余额。'
-                : 'Unlimited amount means the spender may move the full balance while the approval remains valid.'
-            }`
-          : t.signature.findingExplains[finding.kind]}
+          ? `${copy.findingExplains.amount} ${copy.findingExplains.amountUnlimited}`
+          : copy.findingExplains[finding.kind]}
       </td>
     </tr>
   );
@@ -301,13 +322,15 @@ function badgeClass(danger: SignatureDanger): string {
 }
 
 function riskTitle(t: ReturnType<typeof useI18n>['t'], kind: SignatureRiskKind) {
-  if (kind === 'erc20-permit') return t.signature.riskTitles.erc20Permit;
-  if (kind === 'nft-order') return t.signature.riskTitles.nftOrder;
-  return t.signature.riskTitles[kind];
+  const copy = t.signatureRisk;
+  if (kind === 'erc20-permit') return copy.riskTitles.erc20Permit;
+  if (kind === 'nft-order') return copy.riskTitles.nftOrder;
+  return copy.riskTitles[kind];
 }
 
 function riskExplain(t: ReturnType<typeof useI18n>['t'], kind: SignatureRiskKind) {
-  if (kind === 'erc20-permit') return t.signature.riskExplains.erc20Permit;
-  if (kind === 'nft-order') return t.signature.riskExplains.nftOrder;
-  return t.signature.riskExplains[kind];
+  const copy = t.signatureRisk;
+  if (kind === 'erc20-permit') return copy.riskExplains.erc20Permit;
+  if (kind === 'nft-order') return copy.riskExplains.nftOrder;
+  return copy.riskExplains[kind];
 }

@@ -28,7 +28,7 @@ export default function TxRayPage() {
           </div>
         </div>
 
-        <div className="mt-10 grid gap-4 sm:grid-cols-3">
+        <div className="mt-10 grid gap-4 sm:grid-cols-2">
           <Link
             href="/tools/txray/approvals"
             className="card bg-base-200 transition hover:bg-base-300"
@@ -48,16 +48,6 @@ export default function TxRayPage() {
               <p className="text-sm text-base-content/70">{t.txray.decoderDesc}</p>
             </div>
           </Link>
-
-          <Link
-            href="/tools/signature-risk"
-            className="card bg-base-200 transition hover:bg-base-300"
-          >
-            <div className="card-body">
-              <h2 className="card-title">{t.txray.signatureTitle}</h2>
-              <p className="text-sm text-base-content/70">{t.txray.signatureDesc}</p>
-            </div>
-          </Link>
         </div>
 
         <div className="mt-8 grid gap-4 sm:grid-cols-2">
@@ -68,9 +58,6 @@ export default function TxRayPage() {
               <div className="card-actions">
                 <Link href="/tools/txray/approvals?demo=1" className="btn btn-primary btn-sm">
                   {t.txray.openApprovalDemo}
-                </Link>
-                <Link href="/tools/signature-risk" className="btn btn-secondary btn-sm">
-                  {t.txray.openSignatureDemo}
                 </Link>
               </div>
             </div>
@@ -86,12 +73,6 @@ export default function TxRayPage() {
                   className="btn btn-outline btn-sm"
                 >
                   {t.txray.unlimitedApproval}
-                </Link>
-                <Link
-                  href="/articles/permit2-eip712-phishing"
-                  className="btn btn-outline btn-sm"
-                >
-                  {t.txray.permitSignature}
                 </Link>
               </div>
             </div>
