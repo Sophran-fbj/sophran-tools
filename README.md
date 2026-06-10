@@ -1,10 +1,10 @@
-# web3-toolbench
+﻿# Sophran Tools
 
 **语言:** 中文 | [English](./README.en.md)
 
 > 一个不只检测链上风险，也解释风险原因的 web3 工具站。
 
-`web3-toolbench` 是一个个人 web3 工具站。当前第一个工具是 **TxRay**，用于帮助 EVM 用户检查授权、解码交易、分析签名风险。
+`sophran-tools` 是 Sophran 的 web3 工具站。当前第一个工具是 **TxRay**，用于帮助 EVM 用户检查授权、解码交易、分析签名风险。
 
 TxRay 关注真实的用户安全场景：钱包连接、索引化链上数据、RPC 读取、multicall、calldata 解码、Permit2 授权分析、EIP-712 typed data 检查，以及面向用户的人话解释。
 
@@ -160,3 +160,6 @@ pnpm build
 ## License
 
 MIT
+
+
+

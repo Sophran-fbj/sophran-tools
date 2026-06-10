@@ -1,10 +1,10 @@
-# web3-toolbench
+﻿# Sophran Tools
 
 **Languages:** [中文](./README.md) | English
 
-> A web3 toolbench that not only detects on-chain risks, but explains why they matter.
+> Onchain utilities for safer web3 interactions.
 
-`web3-toolbench` is a personal web3 tools site. The first tool is **TxRay**, an approval, transaction, and signature risk assistant for EVM users.
+`sophran-tools` is a web3 tools site by Sophran. The first tool is **TxRay**, an approval, transaction, and signature risk assistant for EVM users.
 
 TxRay focuses on practical user safety: wallet connection, indexed chain data, RPC reads, multicall, calldata decoding, Permit2 allowance analysis, EIP-712 typed-data inspection, and plain-language risk explanation.
 
@@ -160,3 +160,6 @@ pnpm build
 ## License
 
 MIT
+
+
+

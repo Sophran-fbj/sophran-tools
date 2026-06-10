@@ -1,5 +1,5 @@
 {
-  "name": "web3-toolbench",
+  "name": "sophran-tools",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -32,3 +32,4 @@
     "vitest": "^4.1.8"
   }
 }
+

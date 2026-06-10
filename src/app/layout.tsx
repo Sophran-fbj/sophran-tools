@@ -1,10 +1,10 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import "./globals.css";
 import { Providers } from "./providers";
 
 export const metadata: Metadata = {
-  title: "web3-toolbench",
-  description: "个人 web3 工具站 —— 每个风险点都配人话解释",
+  title: "Sophran Tools",
+  description: "Sophran 的 web3 工具站 —— 每个风险点都配人话解释",
 };
 
 export default function RootLayout({
@@ -20,3 +20,5 @@ export default function RootLayout({
     </html>
   );
 }
+
+

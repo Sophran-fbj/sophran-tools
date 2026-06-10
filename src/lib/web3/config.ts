@@ -1,4 +1,4 @@
-import { getDefaultConfig } from '@rainbow-me/rainbowkit';
+﻿import { getDefaultConfig } from '@rainbow-me/rainbowkit';
 import { http } from 'wagmi';
 import { mainnet, arbitrum, optimism, polygon, base } from 'wagmi/chains';
 
@@ -9,7 +9,7 @@ const rpc = (subdomain: string) =>
   alchemyId ? http(`https://${subdomain}.g.alchemy.com/v2/${alchemyId}`) : http();
 
 export const config = getDefaultConfig({
-  appName: 'web3-toolbench',
+  appName: 'Sophran Tools',
   projectId: process.env.NEXT_PUBLIC_WC_PROJECT_ID ?? '',
   chains: [mainnet, arbitrum, optimism, polygon, base],
   transports: {
@@ -21,3 +21,5 @@ export const config = getDefaultConfig({
   },
   ssr: true,
 });
+
+

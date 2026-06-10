@@ -1,4 +1,4 @@
-export type Locale = 'zh' | 'en';
+﻿export type Locale = 'zh' | 'en';
 
 export const messages = {
   zh: {
@@ -13,8 +13,8 @@ export const messages = {
         '本站绝不索要你的助记词或私钥。所有写操作均通过你的钱包签名。',
     },
     home: {
-      title: 'web3-toolbench',
-      subtitle: '个人 web3 工具站。不只显示风险，还用中文解释原理。',
+      title: 'Sophran Tools',
+      subtitle: 'Sophran 的 web3 工具站。不只显示风险，还用中文解释原理。',
       txrayDesc:
         '授权检查 + 交易解码 + EIP-712 签名解码：检测 ERC-20 / NFT / Permit2 授权，标记 spender 风险，并解释危险原因。',
       txrayBadge: '可用',
@@ -117,9 +117,9 @@ export const messages = {
         'This site never asks for your seed phrase or private key. All write actions are signed in your wallet.',
     },
     home: {
-      title: 'web3-toolbench',
+      title: 'Sophran Tools',
       subtitle:
-        'A personal web3 toolbench that detects risks and explains why they matter.',
+        'Onchain utilities for safer web3 interactions.',
       txrayDesc:
         'Approval check, transaction decoding, and EIP-712 signature decoding for ERC-20, NFT, and Permit2 risk analysis.',
       txrayBadge: 'Available',
@@ -214,3 +214,5 @@ export const messages = {
 } as const;
 
 export type Messages = (typeof messages)[Locale];
+
+

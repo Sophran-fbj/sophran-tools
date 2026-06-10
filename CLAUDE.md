@@ -1,10 +1,10 @@
-# CLAUDE.md
+﻿# CLAUDE.md
 
 本文件给在该仓库工作的 Claude Code 提供项目上下文与约定。**动手前先读这里 + `docs/`。**
 
 ## 项目是什么
 
-`web3-toolbench` —— 个人 web3 工具站（平台）。第一个工具是 **TxRay**：
+`sophran-tools` —— Sophran 的 web3 工具站（平台）。第一个工具是 **TxRay**：
 - **V1 授权检查**：列出地址的 ERC-20/721/1155 授权、标记风险、一键撤销。
 - **V2 交易解码**：粘 calldata 或 tx hash，解码并用人话解释在干什么。
 
@@ -75,3 +75,6 @@ pnpm lint
 
 - `docs/需求文档.md` —— V1+V2 完整需求、里程碑、成功标准
 - `docs/技术与架构选型.md` —— 每个选型的决策·理由·备选·取舍
+
+
+
