@@ -14,6 +14,8 @@ export const demoApprovals: Approval[] = [
     symbol: 'USDC',
     decimals: 6,
     amountText: '无限',
+    atRiskAmountRaw: 2500000000n,
+    atRiskAmountText: '2500',
   },
   {
     kind: 'permit2',
@@ -26,6 +28,8 @@ export const demoApprovals: Approval[] = [
     symbol: 'WETH',
     decimals: 18,
     amountText: '无限',
+    atRiskAmountRaw: 1500000000000000000n,
+    atRiskAmountText: '1.5',
   },
   {
     kind: 'nft',

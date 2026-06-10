@@ -24,6 +24,13 @@ import {
   demoRiskMap,
 } from '@/features/txray/approvals/demoApprovals';
 import { WalletButton } from '@/components/WalletButton';
+import {
+  DEFAULT_TXRAY_CHAIN_ID,
+  TXRAY_CHAINS,
+  explorerAddressUrl,
+  getTxRayChain,
+} from '@/features/txray/chains/chains';
+import { useTokenPrices } from '@/features/txray/approvals/useTokenPrices';
 
 export default function ApprovalsPage() {
   return (
@@ -51,6 +58,9 @@ function ApprovalsContent() {
   const demoMode = searchParams.get('demo') === '1';
   const { address: connected } = useAccount();
   const [input, setInput] = useState('');
+  const [selectedChainId, setSelectedChainId] = useState(DEFAULT_TXRAY_CHAIN_ID);
+  const effectiveChainId = demoMode ? DEFAULT_TXRAY_CHAIN_ID : selectedChainId;
+  const chain = getTxRayChain(effectiveChainId);
 
   const trimmed = input.trim();
   const looksLikeEns = trimmed.toLowerCase().endsWith('.eth');
@@ -72,7 +82,7 @@ function ApprovalsContent() {
     target = demoMode ? DEMO_OWNER : connected;
   }
 
-  const approvalsQuery = useApprovals(demoMode ? undefined : target, 1);
+  const approvalsQuery = useApprovals(demoMode ? undefined : target, effectiveChainId);
   const approvals = demoMode ? demoApprovals : approvalsQuery.data;
   const isLoading = demoMode ? false : approvalsQuery.isLoading;
   const isError = demoMode ? false : approvalsQuery.isError;
@@ -83,8 +93,18 @@ function ApprovalsContent() {
     () => (approvals ? Array.from(new Set(approvals.map((a) => a.spender))) : []),
     [approvals],
   );
-  const { data: liveRiskMap } = useSpenderRisk(demoMode ? [] : spenders, 1);
+  const { data: liveRiskMap } = useSpenderRisk(demoMode ? [] : spenders, effectiveChainId);
   const riskMap = demoMode ? demoRiskMap : liveRiskMap;
+  const pricedTokens = useMemo(
+    () =>
+      approvals
+        ? approvals
+            .filter((a) => a.kind !== 'nft')
+            .map((a) => a.token)
+        : [],
+    [approvals],
+  );
+  const { data: tokenPrices } = useTokenPrices(effectiveChainId, pricedTokens);
 
   const canRevoke =
     !demoMode &&
@@ -105,7 +125,9 @@ function ApprovalsContent() {
               ← TxRay
             </Link>
             <h1 className="mt-2 text-3xl font-bold text-primary">授权检查</h1>
-            <p className="mt-1 text-sm text-base-content/60">仅查询以太坊主网</p>
+            <p className="mt-1 text-sm text-base-content/60">
+              当前网络：{chain.name}
+            </p>
           </div>
           <WalletButton />
         </div>
@@ -120,6 +142,27 @@ function ApprovalsContent() {
         )}
 
         <div className="form-control mt-8">
+          <label className="label">
+            <span className="label-text">网络</span>
+            <span className="label-text-alt text-base-content/50">
+              支持 Ethereum / Base / Arbitrum / Optimism
+            </span>
+          </label>
+          <select
+            className="select select-bordered w-full"
+            disabled={demoMode}
+            value={effectiveChainId}
+            onChange={(e) => setSelectedChainId(Number(e.target.value))}
+          >
+            {TXRAY_CHAINS.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="form-control mt-4">
           <label className="label">
             <span className="label-text">查询地址</span>
             <span className="label-text-alt text-base-content/50">
@@ -243,6 +286,8 @@ function ApprovalsContent() {
                           key={a.id}
                           a={a}
                           canRevoke={canRevoke}
+                          chainId={effectiveChainId}
+                          usdPrice={a.kind === 'nft' ? undefined : tokenPrices?.[a.token.toLowerCase()]}
                           risk={riskMap?.[a.spender.toLowerCase()]}
                         />
                       ))}
@@ -265,10 +310,14 @@ function ApprovalsContent() {
 function ApprovalRow({
   a,
   canRevoke,
+  chainId,
+  usdPrice,
   risk,
 }: {
   a: Approval;
   canRevoke: boolean;
+  chainId: number;
+  usdPrice?: number;
   risk?: SpenderRisk;
 }) {
   const queryClient = useQueryClient();
@@ -318,11 +367,11 @@ function ApprovalRow({
             <span className="badge badge-info badge-sm">Permit2</span>
           )}
         </div>
-        <AddrLink addr={a.token} />
+        <AddrLink addr={a.token} chainId={chainId} />
       </td>
       <td>
         <RiskBadge risk={risk} />
-        <AddrLink addr={a.spender} />
+        <AddrLink addr={a.spender} chainId={chainId} />
         {risk && risk.level !== 'known' && (
           <div className="mt-0.5 text-xs text-base-content/50">{risk.reason}</div>
         )}
@@ -337,6 +386,9 @@ function ApprovalRow({
         )}
         {a.kind === 'permit2' && (
           <div className="text-xs text-base-content/50">{expiryText(a.expiration)}</div>
+        )}
+        {a.kind !== 'nft' && (
+          <AtRisk approval={a} usdPrice={usdPrice} />
         )}
       </td>
       <td className="text-right">
@@ -379,10 +431,32 @@ function RiskBadge({ risk }: { risk?: SpenderRisk }) {
   }
 }
 
-function AddrLink({ addr }: { addr: string }) {
+function AtRisk({
+  approval,
+  usdPrice,
+}: {
+  approval: Extract<Approval, { kind: 'erc20' | 'permit2' }>;
+  usdPrice?: number;
+}) {
+  const usdValue =
+    typeof usdPrice === 'number'
+      ? Number(approval.atRiskAmountText) * usdPrice
+      : undefined;
+
+  return (
+    <div className="mt-1 text-xs text-base-content/50">
+      暴露：{approval.atRiskAmountText} {approval.symbol}
+      {typeof usdValue === 'number' && Number.isFinite(usdValue) && (
+        <span className="ml-1 text-warning">≈ ${formatUsd(usdValue)} at risk</span>
+      )}
+    </div>
+  );
+}
+
+function AddrLink({ addr, chainId }: { addr: string; chainId: number }) {
   return (
     <a
-      href={`https://etherscan.io/address/${addr}`}
+      href={explorerAddressUrl(chainId, addr)}
       target="_blank"
       rel="noopener noreferrer"
       className="link link-hover font-mono text-xs text-base-content/60"
@@ -390,6 +464,12 @@ function AddrLink({ addr }: { addr: string }) {
       {addr.slice(0, 8)}…{addr.slice(-6)}
     </a>
   );
+}
+
+function formatUsd(value: number): string {
+  if (value >= 1000) return value.toLocaleString('en-US', { maximumFractionDigits: 0 });
+  if (value >= 1) return value.toLocaleString('en-US', { maximumFractionDigits: 2 });
+  return value.toLocaleString('en-US', { maximumSignificantDigits: 2 });
 }
 
 function expiryText(exp: number): string {

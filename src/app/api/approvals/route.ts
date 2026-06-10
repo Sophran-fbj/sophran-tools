@@ -5,6 +5,7 @@ import {
   PERMIT2_APPROVAL_EVENT,
   PERMIT2_PERMIT_EVENT,
 } from '@/features/txray/approvals/permit2';
+import { isSupportedTxRayChain } from '@/features/txray/chains/chains';
 
 // keccak256("Approval(address,address,uint256)")
 const APPROVAL_TOPIC0 =
@@ -104,6 +105,9 @@ export async function GET(req: NextRequest) {
 
   const ownerParam = req.nextUrl.searchParams.get('owner');
   const chainId = Number(req.nextUrl.searchParams.get('chainId') ?? '1');
+  if (!isSupportedTxRayChain(chainId)) {
+    return NextResponse.json({ error: '暂不支持该链' }, { status: 400 });
+  }
   if (!ownerParam || !isAddress(ownerParam)) {
     return NextResponse.json({ error: '无效地址' }, { status: 400 });
   }

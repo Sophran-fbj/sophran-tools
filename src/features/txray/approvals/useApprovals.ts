@@ -27,6 +27,8 @@ export interface Erc20Approval {
   symbol: string;
   decimals: number;
   amountText: string;
+  atRiskAmountRaw: bigint;
+  atRiskAmountText: string;
 }
 
 export interface NftApproval {
@@ -48,6 +50,8 @@ export interface Permit2Approval {
   symbol: string;
   decimals: number;
   amountText: string;
+  atRiskAmountRaw: bigint;
+  atRiskAmountText: string;
 }
 
 export type Approval = Erc20Approval | NftApproval | Permit2Approval;
@@ -160,7 +164,7 @@ async function fetchApprovals(
 
   // 3) multicall 读元数据（symbol / decimals）—— ERC20 与 Permit2 的 token 都是 ERC20
   const erc20MetaTokens = [...liveErc20, ...livePermit2];
-  const [erc20Meta, nftMeta] = await Promise.all([
+  const [erc20Meta, erc20Balances, nftMeta] = await Promise.all([
     erc20MetaTokens.length
       ? client.multicall({
           allowFailure: true,
@@ -168,6 +172,17 @@ async function fetchApprovals(
             { address: p.token, abi: erc20Abi, functionName: 'symbol' } as const,
             { address: p.token, abi: erc20Abi, functionName: 'decimals' } as const,
           ]),
+        })
+      : [],
+    erc20MetaTokens.length
+      ? client.multicall({
+          allowFailure: true,
+          contracts: erc20MetaTokens.map((p) => ({
+            address: p.token,
+            abi: erc20Abi,
+            functionName: 'balanceOf',
+            args: [owner],
+          })),
         })
       : [],
     liveNft.length
@@ -197,6 +212,10 @@ async function fetchApprovals(
   // 4) 组装
   const erc20Result: Erc20Approval[] = liveErc20.map((p, i) => {
     const { symbol, decimals } = readMeta(i);
+    const balanceRes = erc20Balances[i];
+    const balance =
+      balanceRes?.status === 'success' ? (balanceRes.result as bigint) : 0n;
+    const atRiskAmountRaw = p.allowance < balance ? p.allowance : balance;
     const unlimited = p.allowance > UNLIMITED_THRESHOLD;
     return {
       kind: 'erc20',
@@ -208,11 +227,18 @@ async function fetchApprovals(
       symbol,
       decimals,
       amountText: unlimited ? '无限' : formatUnits(p.allowance, decimals),
+      atRiskAmountRaw,
+      atRiskAmountText: formatUnits(atRiskAmountRaw, decimals),
     };
   });
 
   const permit2Result: Permit2Approval[] = livePermit2.map((p, i) => {
-    const { symbol, decimals } = readMeta(liveErc20.length + i);
+    const metaIndex = liveErc20.length + i;
+    const { symbol, decimals } = readMeta(metaIndex);
+    const balanceRes = erc20Balances[metaIndex];
+    const balance =
+      balanceRes?.status === 'success' ? (balanceRes.result as bigint) : 0n;
+    const atRiskAmountRaw = p.amount < balance ? p.amount : balance;
     const unlimited = p.amount > PERMIT2_UNLIMITED_THRESHOLD;
     return {
       kind: 'permit2',
@@ -225,6 +251,8 @@ async function fetchApprovals(
       symbol,
       decimals,
       amountText: unlimited ? '无限' : formatUnits(p.amount, decimals),
+      atRiskAmountRaw,
+      atRiskAmountText: formatUnits(atRiskAmountRaw, decimals),
     };
   });
 
