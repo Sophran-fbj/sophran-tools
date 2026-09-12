@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { classifySpenderRisk } from './useSpenderRisk';
+import {
+  classifySpenderRisk,
+  parseSpenderInfoPayload,
+} from './useSpenderRisk';
 
 const NOW = 1_800_000_000;
 
@@ -12,6 +15,7 @@ describe('classifySpenderRisk', () => {
     });
 
     expect(result.level).toBe('eoa');
+    expect(result.codeVerified).toBe(true);
     expect(result.reason).toContain('普通钱包');
   });
 
@@ -36,5 +40,32 @@ describe('classifySpenderRisk', () => {
 
     expect(result.level).toBe('new');
     expect(result.reason).toContain('3 天前部署');
+  });
+
+  it('does not classify an RPC failure as an EOA', () => {
+    const result = classifySpenderRisk({
+      address: '0x2222222222222222222222222222222222222222',
+      isEoa: undefined,
+      now: NOW,
+    });
+
+    expect(result.level).toBe('unknown');
+    expect(result.codeVerified).toBe(false);
+    expect(result.reason).toContain('RPC');
+  });
+});
+
+describe('parseSpenderInfoPayload', () => {
+  it('keeps only safe timestamps and normalizes keys', () => {
+    expect(
+      parseSpenderInfoPayload({
+        created: {
+          '0xABC': 1_700_000_000,
+          '0xDEF': null,
+          bad: Number.NaN,
+          negative: -1,
+        },
+      }),
+    ).toEqual({ '0xabc': 1_700_000_000, '0xdef': null });
   });
 });

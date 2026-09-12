@@ -23,7 +23,7 @@ TxRay 的核心是 **检测 + 解释**：
 ### TxRay · 授权检查
 
 - 通过服务端 Etherscan 索引器路由读取 ERC-20、ERC-721 和 Permit2 授权历史；达到分页预算时明确标记为不完整，绝不把截断结果描述为安全。
-- 用 viem multicall 校验当前授权额度，过滤已经失效的历史授权。
+- 用分块的 viem multicall 校验当前授权额度，过滤已经失效的历史授权，避免大地址产生超大 RPC 请求。
 - 检测 ERC-20 无限授权。
 - 检测 NFT `setApprovalForAll` 整集合授权。
 - 检查 Uniswap Permit2 内部授权，而不只看表层的 ERC-20 approve。
@@ -41,7 +41,7 @@ TxRay 的核心是 **检测 + 解释**：
 ### TxRay · 交易解码
 
 - 直接解码 calldata。
-- 通过交易 hash 拉取 transaction input 并解码。
+- 在选定的 Ethereum、Base、Arbitrum 或 Optimism 网络通过交易 hash 拉取 transaction input 并解码。
 - 识别 `approve`、`setApprovalForAll`、`permit`、`transferFrom`、`transfer` 等常见选择器。
 - 高亮高风险调用，并解释函数可能授权什么。
 - 未知选择器 fallback 到 OpenChain 签名库查询。
@@ -92,7 +92,8 @@ src/
 │  └─ api/                  # 服务端索引器/签名辅助路由
 ├─ components/              # 共享 UI 组件
 ├─ content/articles.ts      # 轻量文章内容注册表
-├─ features/txray/          # 授权、交易解码、签名分析逻辑
+├─ features/txray/          # 授权与交易解码逻辑
+├─ features/signature-risk/ # EIP-712 签名分析逻辑
 └─ lib/
    ├─ i18n/                 # 本地双语文本 provider
    └─ web3/                 # wagmi / viem 配置
@@ -117,6 +118,7 @@ src/
 - 默认都是只读分析。
 - 写操作只限于用户通过钱包主动发起的撤销交易。
 - Etherscan API key 保留在服务端。
+- 不持久化钱包地址或建立用户画像；授权和合约信息路由会瞬时处理查询地址，并将查询条件发送给 Etherscan。RPC 与 CoinGecko 请求也受各自第三方隐私政策约束。
 - WalletConnect 和 Alchemy public key 属于前端 key，应在供应商后台配置域名限制。
 
 ## 本地开发
@@ -154,10 +156,12 @@ DEV_PROXY=http://127.0.0.1:10808
 
 ```bash
 pnpm lint
-pnpm exec tsc --noEmit
+pnpm typecheck
 pnpm test
 pnpm build
 ```
+
+GitHub Actions 会在 push 和 pull request 上执行同一组检查。
 
 ## 后续方向
 

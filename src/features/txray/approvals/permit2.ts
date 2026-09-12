@@ -1,8 +1,9 @@
-import { type Address } from 'viem';
+import { getAddress } from 'viem';
 
 // Permit2 在所有链上都是同一个地址
-export const PERMIT2_ADDRESS =
-  '0x000000000022d473030f116ddee9f6b43ac78ba3' as Address;
+export const PERMIT2_ADDRESS = getAddress(
+  '0x000000000022d473030f116ddee9f6b43ac78ba3',
+);
 
 // 超过此量级即视为无限（uint160 最大值约 2^160）
 export const PERMIT2_UNLIMITED_THRESHOLD = 2n ** 150n;

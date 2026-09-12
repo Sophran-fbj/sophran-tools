@@ -11,6 +11,7 @@ import {
   requestClientKey,
   scheduleExternalRequest,
 } from '@/lib/server/requestGuard';
+import { isRecord } from '@/lib/validation';
 
 const APPROVAL_TOPIC0 =
   '0x8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925';
@@ -24,6 +25,7 @@ const PAGE_SIZE = 1000;
 const MAX_PAGES_PER_SOURCE = 10;
 const UPSTREAM_TIMEOUT_MS = 12_000;
 const CACHE_TTL_MS = 60_000;
+const MAX_CACHE_ENTRIES = 2_000;
 
 interface EtherscanLog {
   address: string;
@@ -57,13 +59,28 @@ const responseCache = new Map<
 >();
 const inFlight = new Map<string, Promise<ApprovalIndexResponse>>();
 
+function cacheResponse(key: string, value: ApprovalIndexResponse): void {
+  const now = Date.now();
+  if (responseCache.size >= MAX_CACHE_ENTRIES) {
+    for (const [cachedKey, cached] of responseCache) {
+      if (cached.expiresAt <= now) responseCache.delete(cachedKey);
+    }
+  }
+  while (responseCache.size >= MAX_CACHE_ENTRIES) {
+    const oldestKey = responseCache.keys().next().value;
+    if (typeof oldestKey !== 'string') break;
+    responseCache.delete(oldestKey);
+  }
+  responseCache.set(key, { expiresAt: now + CACHE_TTL_MS, value });
+}
+
 function topicToAddress(topic: string): string {
   return getAddress(`0x${topic.slice(-40)}`);
 }
 
 function isEtherscanLog(value: unknown): value is EtherscanLog {
-  if (!value || typeof value !== 'object') return false;
-  const log = value as Record<string, unknown>;
+  if (!isRecord(value)) return false;
+  const log = value;
   return (
     typeof log.address === 'string' &&
     isAddress(log.address) &&
@@ -73,8 +90,8 @@ function isEtherscanLog(value: unknown): value is EtherscanLog {
 }
 
 function upstreamMessage(value: unknown): string {
-  if (!value || typeof value !== 'object') return '';
-  const json = value as Record<string, unknown>;
+  if (!isRecord(value)) return '';
+  const json = value;
   if (typeof json.result === 'string') return json.result;
   return typeof json.message === 'string' ? json.message : '';
 }
@@ -89,8 +106,8 @@ async function fetchLogPage(url: URL): Promise<EtherscanLog[]> {
   if (!response.ok) throw new Error(`Etherscan HTTP ${response.status}`);
 
   const json: unknown = await response.json();
-  if (json && typeof json === 'object') {
-    const result = (json as Record<string, unknown>).result;
+  if (isRecord(json)) {
+    const result = json.result;
     if (Array.isArray(result)) {
       if (!result.every(isEtherscanLog)) {
         throw new Error('Etherscan 返回了无效日志数据');
@@ -214,14 +231,6 @@ async function scanApprovals(
 }
 
 export async function GET(request: NextRequest) {
-  const apiKey = process.env.ETHERSCAN_API_KEY;
-  if (!apiKey) {
-    return NextResponse.json(
-      { error: { code: 'CONFIG_MISSING', message: '服务端未配置 Etherscan API key' } },
-      { status: 503 },
-    );
-  }
-
   const rateLimit = checkRateLimit(
     `approvals:${requestClientKey(request.headers)}`,
     8,
@@ -252,6 +261,14 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  const apiKey = process.env.ETHERSCAN_API_KEY;
+  if (!apiKey) {
+    return NextResponse.json(
+      { error: { code: 'CONFIG_MISSING', message: '服务端未配置 Etherscan API key' } },
+      { status: 503 },
+    );
+  }
+
   const owner = getAddress(ownerParam);
   const cacheKey = `${chainId}:${owner.toLowerCase()}`;
   const cached = responseCache.get(cacheKey);
@@ -268,7 +285,7 @@ export async function GET(request: NextRequest) {
       inFlight.set(cacheKey, pending);
     }
     const value = await pending;
-    responseCache.set(cacheKey, { expiresAt: Date.now() + CACHE_TTL_MS, value });
+    cacheResponse(cacheKey, value);
     return NextResponse.json(value, {
       headers: { 'Cache-Control': 'public, max-age=30, s-maxage=60' },
     });

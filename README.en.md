@@ -23,7 +23,7 @@ TxRay focuses on **detect + explain**:
 ### TxRay · Approval Check
 
 - Read ERC-20, ERC-721, and Permit2 approval history through a server-side Etherscan indexer route; explicitly mark results incomplete when the pagination budget is reached.
-- Verify current allowances with viem multicall, so stale historical approvals are filtered out.
+- Verify current allowances with chunked viem multicalls, filtering stale approvals without creating oversized RPC requests.
 - Detect unlimited ERC-20 allowances.
 - Detect NFT `setApprovalForAll` collection-level approvals.
 - Inspect Uniswap Permit2 internal allowances.
@@ -41,7 +41,7 @@ TxRay focuses on **detect + explain**:
 ### TxRay · Transaction Decoder
 
 - Decode calldata directly.
-- Decode a transaction hash by fetching the transaction input.
+- Fetch and decode transaction input on the selected Ethereum, Base, Arbitrum, or Optimism network.
 - Recognize common selectors such as `approve`, `setApprovalForAll`, `permit`, `transferFrom`, and `transfer`.
 - Highlight high-risk calls and explain what the function can authorize.
 - Fallback to an OpenChain signature lookup for unknown selectors.
@@ -92,7 +92,8 @@ src/
 │  └─ api/                  # server-side indexer/signature helper routes
 ├─ components/              # shared UI components
 ├─ content/articles.ts      # lightweight article content registry
-├─ features/txray/          # approval, decoder, signature logic
+├─ features/txray/          # approval and transaction decoder logic
+├─ features/signature-risk/ # EIP-712 signature analysis logic
 └─ lib/
    ├─ i18n/                 # local bilingual text provider
    └─ web3/                 # wagmi / viem configuration
@@ -117,6 +118,7 @@ The project deliberately avoids monorepo complexity for now. There is only one d
 - Read-only analysis by default.
 - Write operations are limited to revoke transactions initiated through the user's wallet.
 - Etherscan API key stays server-side.
+- Wallet addresses are not persisted or profiled. Approval and contract-info routes process query addresses transiently and send query parameters to Etherscan; RPC and CoinGecko requests are also subject to those providers' privacy policies.
 - WalletConnect and Alchemy public keys are frontend keys and should be domain-restricted in provider dashboards.
 
 ## Local Development
@@ -154,10 +156,12 @@ Without `NEXT_PUBLIC_WC_PROJECT_ID`, local builds still work with injected brows
 
 ```bash
 pnpm lint
-pnpm exec tsc --noEmit
+pnpm typecheck
 pnpm test
 pnpm build
 ```
+
+GitHub Actions runs the same checks on pushes and pull requests.
 
 ## Next Steps
 

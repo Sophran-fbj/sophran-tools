@@ -6,6 +6,7 @@ import {
   requestClientKey,
   scheduleExternalRequest,
 } from '@/lib/server/requestGuard';
+import { isRecord } from '@/lib/validation';
 
 const ETHERSCAN_BASE = 'https://api.etherscan.io/v2/api';
 const MAX_ADDRESSES = 25;
@@ -17,12 +18,13 @@ interface ContractCreation {
 }
 
 function isContractCreation(value: unknown): value is ContractCreation {
-  if (!value || typeof value !== 'object') return false;
-  const item = value as Record<string, unknown>;
+  if (!isRecord(value)) return false;
+  const item = value;
   return (
     typeof item.contractAddress === 'string' &&
     isAddress(item.contractAddress) &&
-    (item.timestamp === undefined || typeof item.timestamp === 'string')
+    (item.timestamp === undefined ||
+      (typeof item.timestamp === 'string' && /^\d+$/.test(item.timestamp)))
   );
 }
 
@@ -98,16 +100,17 @@ export async function GET(request: NextRequest) {
       );
       if (!response.ok) throw new Error(`Etherscan HTTP ${response.status}`);
       const json: unknown = await response.json();
-      const result =
-        json && typeof json === 'object'
-          ? (json as Record<string, unknown>).result
-          : undefined;
+      const result = isRecord(json) ? json.result : undefined;
       if (!Array.isArray(result) || !result.every(isContractCreation)) {
         throw new Error('Etherscan 返回了无效合约创建数据');
       }
       for (const item of result) {
         const address = getAddress(item.contractAddress).toLowerCase();
-        created[address] = item.timestamp ? Number(item.timestamp) : null;
+        const timestamp = item.timestamp ? Number(item.timestamp) : undefined;
+        created[address] =
+          timestamp !== undefined && Number.isSafeInteger(timestamp)
+            ? timestamp
+            : null;
       }
     } catch (error) {
       complete = false;

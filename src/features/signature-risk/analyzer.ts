@@ -1,4 +1,5 @@
 import { isAddress, type Address } from 'viem';
+import { isRecord } from '@/lib/validation';
 
 export type SignatureDanger = 'high' | 'medium' | 'low' | 'unknown';
 export type SignatureFindingKind =
@@ -163,10 +164,6 @@ function parseJson(input: string): unknown {
   } catch {
     throw new Error('Input is not valid JSON.');
   }
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
 function parseTypedDataCandidate(value: unknown): Record<string, unknown> | undefined {

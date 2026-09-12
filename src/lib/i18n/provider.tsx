@@ -3,6 +3,7 @@
 import {
   createContext,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
@@ -18,17 +19,32 @@ interface I18nContextValue {
 const I18nContext = createContext<I18nContextValue | null>(null);
 
 export function I18nProvider({ children }: { children: ReactNode }) {
-  const [locale, setLocaleState] = useState<Locale>(() => {
-    if (typeof window === 'undefined') return 'zh';
-    const saved = window.localStorage.getItem('txray-locale');
-    return saved === 'zh' || saved === 'en' ? saved : 'zh';
-  });
+  const [locale, setLocaleState] = useState<Locale>('zh');
+
+  useEffect(() => {
+    const restorePreference = window.setTimeout(() => {
+      try {
+        const saved = window.localStorage.getItem('txray-locale');
+        if (saved === 'zh' || saved === 'en') setLocaleState(saved);
+      } catch {
+        // Storage can be disabled; Chinese remains the deterministic default.
+      }
+    }, 0);
+    return () => window.clearTimeout(restorePreference);
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.lang = locale === 'zh' ? 'zh-CN' : 'en';
+  }, [locale]);
 
   const value = useMemo<I18nContextValue>(() => {
     const setLocale = (next: Locale) => {
       setLocaleState(next);
-      window.localStorage.setItem('txray-locale', next);
-      document.documentElement.lang = next === 'zh' ? 'zh-CN' : 'en';
+      try {
+        window.localStorage.setItem('txray-locale', next);
+      } catch {
+        // The in-memory preference still works for this tab.
+      }
     };
 
     return { locale, setLocale, t: messages[locale] };

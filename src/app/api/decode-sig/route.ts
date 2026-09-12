@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { checkRateLimit, requestClientKey } from '@/lib/server/requestGuard';
+import { isRecord } from '@/lib/validation';
 
 // 服务端反查函数选择器 → 签名（openchain 签名数据库）。
 // 放服务端：① 在国内 dev 下走 DEV_PROXY；② 避免浏览器跨域。
@@ -56,11 +57,11 @@ function getSignatureList(
   value: unknown,
   selector: string,
 ): Array<{ name?: unknown }> | undefined {
-  if (!value || typeof value !== 'object') return undefined;
-  const result = (value as Record<string, unknown>).result;
-  if (!result || typeof result !== 'object') return undefined;
-  const functions = (result as Record<string, unknown>).function;
-  if (!functions || typeof functions !== 'object') return undefined;
-  const list = (functions as Record<string, unknown>)[selector];
+  if (!isRecord(value)) return undefined;
+  const result = value.result;
+  if (!isRecord(result)) return undefined;
+  const functions = result.function;
+  if (!isRecord(functions)) return undefined;
+  const list = functions[selector];
   return Array.isArray(list) ? list : undefined;
 }

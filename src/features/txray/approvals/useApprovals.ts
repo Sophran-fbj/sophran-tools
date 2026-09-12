@@ -16,8 +16,11 @@ import {
   PERMIT2_UNLIMITED_THRESHOLD,
   permit2Abi,
 } from './permit2';
+import { runInChunks } from '@/lib/web3/runInChunks';
+import { isRecord } from '@/lib/validation';
 
 const UNLIMITED_THRESHOLD = 2n ** 200n;
+const MULTICALL_CHUNK_SIZE = 100;
 
 interface FungibleApprovalDisplay {
   symbol: string;
@@ -98,13 +101,9 @@ export function useApprovals(owner: Address | undefined, chainId = 1) {
     staleTime: 60_000,
     queryFn: async () => {
       if (!client || !owner) throw new Error('RPC 或查询地址不可用');
-      return fetchApprovals(client as PublicClient, owner, chainId);
+      return fetchApprovals(client, owner, chainId);
     },
   });
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
 function readBigIntResult(result: unknown): bigint | undefined {
@@ -129,6 +128,11 @@ function readPermit2Result(
 function readBooleanResult(result: unknown): boolean | undefined {
   if (!isRecord(result) || result.status !== 'success') return undefined;
   return typeof result.result === 'boolean' ? result.result : undefined;
+}
+
+function readSuccessResult(result: unknown): unknown {
+  if (!isRecord(result) || result.status !== 'success') return undefined;
+  return result.result;
 }
 
 function parsePairs(value: unknown, field: string): Pair[] {
@@ -202,39 +206,39 @@ async function fetchApprovals(
   }
 
   const [allowances, nftApproved, permit2Allowances] = await Promise.all([
-    index.erc20.length
-      ? client.multicall({
+    runInChunks<Pair, unknown>(index.erc20, MULTICALL_CHUNK_SIZE, (chunk) =>
+      client.multicall({
           allowFailure: true,
-          contracts: index.erc20.map((pair) => ({
+          contracts: chunk.map((pair) => ({
             address: pair.token,
             abi: erc20Abi,
             functionName: 'allowance',
             args: [owner, pair.spender],
           })),
-        })
-      : [],
-    index.nft.length
-      ? client.multicall({
+        }),
+    ),
+    runInChunks<Pair, unknown>(index.nft, MULTICALL_CHUNK_SIZE, (chunk) =>
+      client.multicall({
           allowFailure: true,
-          contracts: index.nft.map((pair) => ({
+          contracts: chunk.map((pair) => ({
             address: pair.token,
             abi: erc721Abi,
             functionName: 'isApprovedForAll',
             args: [owner, pair.spender],
           })),
-        })
-      : [],
-    index.permit2.length
-      ? client.multicall({
+        }),
+    ),
+    runInChunks<Pair, unknown>(index.permit2, MULTICALL_CHUNK_SIZE, (chunk) =>
+      client.multicall({
           allowFailure: true,
-          contracts: index.permit2.map((pair) => ({
+          contracts: chunk.map((pair) => ({
             address: PERMIT2_ADDRESS,
             abi: permit2Abi,
             functionName: 'allowance',
             args: [owner, pair.token, pair.spender],
           })),
-        })
-      : [],
+        }),
+    ),
   ]);
 
   const failedCurrentReads =
@@ -268,42 +272,50 @@ async function fetchApprovals(
 
   const fungibleTokens = [...liveErc20, ...livePermit2];
   const [metadata, balances, nftMetadata] = await Promise.all([
-    fungibleTokens.length
-      ? client.multicall({
+    runInChunks<(typeof fungibleTokens)[number], unknown>(
+      fungibleTokens,
+      MULTICALL_CHUNK_SIZE,
+      (chunk) => client.multicall({
           allowFailure: true,
-          contracts: fungibleTokens.flatMap((pair) => [
+          contracts: chunk.flatMap((pair) => [
             { address: pair.token, abi: erc20Abi, functionName: 'symbol' } as const,
             { address: pair.token, abi: erc20Abi, functionName: 'decimals' } as const,
           ]),
-        })
-      : [],
-    fungibleTokens.length
-      ? client.multicall({
+        }),
+    ),
+    runInChunks<(typeof fungibleTokens)[number], unknown>(
+      fungibleTokens,
+      MULTICALL_CHUNK_SIZE,
+      (chunk) => client.multicall({
           allowFailure: true,
-          contracts: fungibleTokens.map((pair) => ({
+          contracts: chunk.map((pair) => ({
             address: pair.token,
             abi: erc20Abi,
             functionName: 'balanceOf',
             args: [owner],
           })),
-        })
-      : [],
-    liveNft.length
-      ? client.multicall({
+        }),
+    ),
+    runInChunks<(typeof liveNft)[number], unknown>(
+      liveNft,
+      MULTICALL_CHUNK_SIZE,
+      (chunk) => client.multicall({
           allowFailure: true,
-          contracts: liveNft.map((pair) => ({
+          contracts: chunk.map((pair) => ({
             address: pair.token,
             abi: erc721Abi,
             functionName: 'symbol' as const,
           })),
-        })
-      : [],
+        }),
+    ),
   ]);
 
   const failedDecimals = fungibleTokens.filter(
-    (_, index) => metadata[index * 2 + 1]?.status !== 'success',
+    (_, index) => readSuccessResult(metadata[index * 2 + 1]) === undefined,
   ).length;
-  const failedBalances = balances.filter((result) => result.status === 'failure').length;
+  const failedBalances = balances.filter(
+    (result) => readBigIntResult(result) === undefined,
+  ).length;
   if (failedDecimals > 0) {
     warnings.push(`${failedDecimals} 个代币的 decimals 读取失败，额度将显示为原始整数。`);
   }
@@ -313,13 +325,12 @@ async function fetchApprovals(
 
   function readDisplay(index: number, rawAmount: bigint): FungibleApprovalDisplay {
     const token = fungibleTokens[index].token;
-    const symbolResult = metadata[index * 2];
-    const decimalsResult = metadata[index * 2 + 1];
+    const symbolResult = readSuccessResult(metadata[index * 2]);
+    const decimalsResult = readSuccessResult(metadata[index * 2 + 1]);
     const balance = readBigIntResult(balances[index]);
     const symbol =
-      symbolResult?.status === 'success' ? String(symbolResult.result) : shortAddr(token);
-    const decimals =
-      decimalsResult?.status === 'success' ? Number(decimalsResult.result) : null;
+      symbolResult !== undefined ? String(symbolResult) : shortAddr(token);
+    const decimals = decimalsResult !== undefined ? Number(decimalsResult) : null;
     const amountText = decimals === null ? `${rawAmount.toString()} raw` : formatUnits(rawAmount, decimals);
 
     if (balance === undefined) {
@@ -371,16 +382,14 @@ async function fetchApprovals(
   });
 
   const nftResult: NftApproval[] = liveNft.map((pair, index) => {
-    const symbolResult = nftMetadata[index];
+    const symbolResult = readSuccessResult(nftMetadata[index]);
     return {
       kind: 'nft',
       id: pairKey(pair.token, pair.spender),
       token: pair.token,
       spender: pair.spender,
       symbol:
-        symbolResult?.status === 'success'
-          ? String(symbolResult.result)
-          : shortAddr(pair.token),
+        symbolResult !== undefined ? String(symbolResult) : shortAddr(pair.token),
     };
   });
 

@@ -5,12 +5,13 @@ import { usePublicClient } from 'wagmi';
 import {
   decodeFunctionData,
   parseAbiItem,
-  type AbiFunction,
   type Address,
+  type Hash,
   type Hex,
   type PublicClient,
 } from 'viem';
 import { KNOWN_SIGNATURES, type Danger } from './signatures';
+import { isRecord } from '@/lib/validation';
 
 export interface DecodedParam {
   name?: string;
@@ -31,9 +32,15 @@ export interface DecodedResult {
   raw: Hex;
 }
 
-const isTxHash = (s: string) => /^0x[0-9a-fA-F]{64}$/.test(s);
-const isCalldata = (s: string) =>
-  /^0x[0-9a-fA-F]{8,}$/.test(s) && (s.length - 2) % 2 === 0;
+type SignatureLookup = (selector: string) => Promise<string | null>;
+
+function isTxHash(value: string): value is Hash {
+  return /^0x[0-9a-fA-F]{64}$/.test(value);
+}
+
+function isCalldata(value: string): value is Hex {
+  return /^0x[0-9a-fA-F]{8,}$/.test(value) && (value.length - 2) % 2 === 0;
+}
 
 export function useDecoder(input: string, chainId = 1) {
   const client = usePublicClient({ chainId });
@@ -45,20 +52,28 @@ export function useDecoder(input: string, chainId = 1) {
     enabled,
     staleTime: 60_000,
     retry: false,
-    queryFn: () => decode(client as PublicClient, value),
+    queryFn: async () => {
+      if (!client) throw new Error('目标链 RPC 不可用');
+      return decodeInput(client, value);
+    },
   });
 }
 
-async function decode(client: PublicClient, value: string): Promise<DecodedResult> {
+export async function decodeInput(
+  client: PublicClient | undefined,
+  value: string,
+  lookupSignature: SignatureLookup = fetchSignature,
+): Promise<DecodedResult> {
   let calldata: string;
   let to: Address | undefined;
   let source: 'calldata' | 'tx';
 
   if (isTxHash(value)) {
+    if (!client) throw new Error('读取交易 hash 需要目标链 RPC');
     source = 'tx';
-    const tx = await client.getTransaction({ hash: value as Hex });
-    calldata = tx.input;
-    to = tx.to ?? undefined;
+    const transaction = await client.getTransaction({ hash: value });
+    calldata = transaction.input;
+    to = transaction.to ?? undefined;
     if (!calldata || calldata === '0x') {
       throw new Error('这是一笔普通转账（没有 calldata 可解码）');
     }
@@ -73,35 +88,26 @@ async function decode(client: PublicClient, value: string): Promise<DecodedResul
 
   const selector = calldata.slice(0, 10).toLowerCase();
   const known = KNOWN_SIGNATURES[selector];
-  let signature: string | null = known?.signature ?? null;
-
-  // 本地没命中 → 服务端反查 openchain
-  if (!signature) {
-    try {
-      const r = await fetch(`/api/decode-sig?selector=${selector}`);
-      const j = await r.json();
-      signature = (j.signature as string | null) ?? null;
-    } catch {
-      signature = null;
-    }
-  }
+  const signature = known?.signature ?? (await lookupSignature(selector));
 
   let params: DecodedParam[] = [];
   let functionName: string | null = null;
   if (signature) {
     try {
-      const item = parseAbiItem(`function ${signature}`) as AbiFunction;
-      functionName = item.name;
-      const decoded = decodeFunctionData({ abi: [item], data: calldata as Hex });
-      const args = (decoded.args ?? []) as readonly unknown[];
-      params = item.inputs.map((inp, i) => ({
-        name: inp.name,
-        type: inp.type,
-        value: formatValue(args[i]),
-        isAddress: inp.type === 'address',
-      }));
+      const item = parseAbiItem(`function ${signature}`);
+      if (item.type === 'function') {
+        functionName = item.name;
+        const decoded = decodeFunctionData({ abi: [item], data: calldata });
+        const args = decoded.args ?? [];
+        params = item.inputs.map((input, index) => ({
+          name: input.name,
+          type: input.type,
+          value: formatValue(args[index]),
+          isAddress: input.type === 'address',
+        }));
+      }
     } catch {
-      // 选择器匹配但参数解不出（签名歧义/数据不符）：保留签名，不强解参数
+      // A signature database match can be ambiguous; preserve the signature and raw data.
     }
   }
 
@@ -114,17 +120,37 @@ async function decode(client: PublicClient, value: string): Promise<DecodedResul
     params,
     danger: known?.danger ?? 'none',
     explain: known?.explain,
-    raw: calldata as Hex,
+    raw: calldata,
   };
 }
 
-function formatValue(v: unknown): string {
-  if (typeof v === 'bigint') return v.toString();
-  if (Array.isArray(v)) return `[${v.map(formatValue).join(', ')}]`;
-  if (v && typeof v === 'object') {
-    return JSON.stringify(v, (_, val) =>
-      typeof val === 'bigint' ? val.toString() : val,
+async function fetchSignature(selector: string): Promise<string | null> {
+  try {
+    const response = await fetch(`/api/decode-sig?selector=${selector}`);
+    if (!response.ok) return null;
+    const value: unknown = await response.json();
+    if (!isRecord(value)) return null;
+    return typeof value.signature === 'string' ? value.signature : null;
+  } catch {
+    return null;
+  }
+}
+
+function formatValue(value: unknown): string {
+  if (typeof value === 'bigint') return value.toString();
+  if (Array.isArray(value)) return `[${value.map(formatValue).join(', ')}]`;
+  if (value && typeof value === 'object') {
+    return JSON.stringify(value, (_, nested) =>
+      typeof nested === 'bigint' ? nested.toString() : nested,
     );
   }
-  return String(v);
+  return String(value);
+}
+
+export function isMaxUintValue(type: string, value: string): boolean {
+  const match = /^uint(\d{0,3})$/.exec(type);
+  if (!match || !/^\d+$/.test(value)) return false;
+  const bits = match[1] ? Number(match[1]) : 256;
+  if (bits < 8 || bits > 256 || bits % 8 !== 0) return false;
+  return BigInt(value) === 2n ** BigInt(bits) - 1n;
 }

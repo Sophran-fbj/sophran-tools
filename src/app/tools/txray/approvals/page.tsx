@@ -1,25 +1,13 @@
 'use client';
 
-import { Suspense, useEffect, useMemo, useState } from 'react';
+import { Suspense, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import {
-  useAccount,
-  useEnsAddress,
-  usePublicClient,
-  useSwitchChain,
-  useWriteContract,
-  useWaitForTransactionReceipt,
-} from 'wagmi';
-import { useQueryClient } from '@tanstack/react-query';
-import { erc20Abi, erc721Abi, isAddress, type Address } from 'viem';
+import { useAccount, useEnsAddress } from 'wagmi';
+import { getAddress, isAddress, type Address } from 'viem';
 import { normalize } from 'viem/ens';
-import { useApprovals, type Approval } from '@/features/txray/approvals/useApprovals';
-import {
-  useSpenderRisk,
-  type SpenderRisk,
-} from '@/features/txray/approvals/useSpenderRisk';
-import { PERMIT2_ADDRESS, permit2Abi } from '@/features/txray/approvals/permit2';
+import { useApprovals } from '@/features/txray/approvals/useApprovals';
+import { useSpenderRisk } from '@/features/txray/approvals/useSpenderRisk';
 import {
   DEMO_OWNER,
   demoApprovals,
@@ -29,11 +17,10 @@ import { WalletButton } from '@/components/WalletButton';
 import {
   DEFAULT_TXRAY_CHAIN_ID,
   TXRAY_CHAINS,
-  explorerAddressUrl,
-  explorerTxUrl,
   getTxRayChain,
 } from '@/features/txray/chains/chains';
 import { useTokenPrices } from '@/features/txray/approvals/useTokenPrices';
+import { ApprovalRow } from '@/features/txray/approvals/ApprovalRow';
 
 export default function ApprovalsPage() {
   return (
@@ -78,7 +65,7 @@ function ApprovalsContent() {
   let target: Address | undefined;
   let inputError: string | undefined;
   if (trimmed) {
-    if (isAddress(trimmed)) target = trimmed as Address;
+    if (isAddress(trimmed)) target = getAddress(trimmed);
     else if (looksLikeEns) target = ensResolved ?? undefined;
     else inputError = '请输入合法地址（0x…）或 ENS 域名（xxx.eth）';
   } else {
@@ -99,7 +86,10 @@ function ApprovalsContent() {
     () => (approvals ? Array.from(new Set(approvals.map((a) => a.spender))) : []),
     [approvals],
   );
-  const { data: liveRiskMap } = useSpenderRisk(demoMode ? [] : spenders, effectiveChainId);
+  const {
+    data: liveRiskMap,
+    isError: isRiskError,
+  } = useSpenderRisk(demoMode ? [] : spenders, effectiveChainId);
   const riskMap = demoMode ? demoRiskMap : liveRiskMap;
   const pricedTokens = useMemo(
     () =>
@@ -226,7 +216,7 @@ function ApprovalsContent() {
             {isError && (
               <div className="alert alert-error">
                 <span className="text-sm">
-                  查询失败：{(error as Error)?.message ?? '未知错误'}
+                  查询失败：{error?.message ?? '未知错误'}
                   <br />
                   <span className="text-xs opacity-80">
                     “fetch failed” 多为服务端连不上 Etherscan（网络/代理问题）；请看 dev 终端的详细报错。
@@ -245,6 +235,12 @@ function ApprovalsContent() {
                     ))}
                   </ul>
                 </div>
+              </div>
+            )}
+
+            {isRiskError && (
+              <div className="alert alert-warning mb-4 text-sm">
+                spender 风险画像暂时不可用；授权额度仍来自链上实时读取。
               </div>
             )}
 
@@ -303,11 +299,12 @@ function ApprovalsContent() {
                       {approvals.map((a) => (
                         <ApprovalRow
                           key={a.id}
-                          a={a}
-                           canRevoke={canRevoke}
-                            chainId={effectiveChainId}
-                            connected={connected}
-                            walletChainId={walletChainId}
+                          approval={a}
+                          canRevoke={canRevoke}
+                          chainId={effectiveChainId}
+                          connected={connected}
+                          walletChainId={walletChainId}
+                          riskUnavailable={isRiskError}
                           usdPrice={a.kind === 'nft' ? undefined : tokenPrices?.[a.token.toLowerCase()]}
                           risk={riskMap?.[a.spender.toLowerCase()]}
                         />
@@ -326,240 +323,6 @@ function ApprovalsContent() {
       </div>
     </main>
   );
-}
-
-function ApprovalRow({
-  a,
-  canRevoke,
-  chainId,
-  connected,
-  walletChainId,
-  usdPrice,
-  risk,
-}: {
-  a: Approval;
-  canRevoke: boolean;
-  chainId: number;
-  connected?: Address;
-  walletChainId?: number;
-  usdPrice?: number;
-  risk?: SpenderRisk;
-}) {
-  const queryClient = useQueryClient();
-  const publicClient = usePublicClient({ chainId });
-  const { switchChainAsync, isPending: isSwitching } = useSwitchChain();
-  const {
-    writeContractAsync,
-    data: hash,
-    isPending,
-    error: writeError,
-    reset: resetWrite,
-  } = useWriteContract();
-  const [prepareError, setPrepareError] = useState<Error>();
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
-    hash,
-    chainId,
-  });
-
-  useEffect(() => {
-    if (isSuccess) queryClient.invalidateQueries({ queryKey: ['approvals', chainId] });
-  }, [chainId, isSuccess, queryClient]);
-
-  const revoke = async () => {
-    resetWrite();
-    setPrepareError(undefined);
-    if (!canRevoke || !connected || !publicClient) {
-      setPrepareError(new Error('钱包或目标链 RPC 不可用'));
-      return;
-    }
-
-    try {
-      if (walletChainId !== chainId) {
-        await switchChainAsync({ chainId });
-      }
-
-      if (a.kind === 'erc20') {
-        const { request } = await publicClient.simulateContract({
-          account: connected,
-          address: a.token,
-          abi: erc20Abi,
-          functionName: 'approve',
-          args: [a.spender, 0n],
-        });
-        await writeContractAsync({ ...request, chainId });
-      } else if (a.kind === 'nft') {
-        const { request } = await publicClient.simulateContract({
-          account: connected,
-          address: a.token,
-          abi: erc721Abi,
-          functionName: 'setApprovalForAll',
-          args: [a.spender, false],
-        });
-        await writeContractAsync({ ...request, chainId });
-      } else {
-        const { request } = await publicClient.simulateContract({
-          account: connected,
-          address: PERMIT2_ADDRESS,
-          abi: permit2Abi,
-          functionName: 'approve',
-          args: [a.token, a.spender, 0n, 0],
-        });
-        await writeContractAsync({ ...request, chainId });
-      }
-    } catch (error) {
-      setPrepareError(error instanceof Error ? error : new Error('撤销交易准备失败'));
-    }
-  };
-
-  const busy = isSwitching || isPending || isConfirming;
-  const transactionError = prepareError ?? writeError;
-
-  return (
-    <tr>
-      <td>
-        <div className="flex items-center gap-2">
-          <span className="font-semibold">{a.symbol}</span>
-          {a.kind === 'nft' && (
-            <span className="badge badge-ghost badge-sm">NFT 集合</span>
-          )}
-          {a.kind === 'permit2' && (
-            <span className="badge badge-info badge-sm">Permit2</span>
-          )}
-        </div>
-        <AddrLink addr={a.token} chainId={chainId} />
-      </td>
-      <td>
-        <RiskBadge risk={risk} />
-        <AddrLink addr={a.spender} chainId={chainId} />
-        {risk && risk.level !== 'known' && (
-          <div className="mt-0.5 text-xs text-base-content/50">{risk.reason}</div>
-        )}
-      </td>
-      <td className="text-right">
-        {a.kind === 'nft' ? (
-          <span className="badge badge-error badge-sm">全部 NFT</span>
-        ) : a.unlimited ? (
-          <span className="badge badge-error badge-sm">无限</span>
-        ) : (
-          <span className="font-mono text-sm">{a.amountText}</span>
-        )}
-        {a.kind === 'permit2' && (
-          <div className="text-xs text-base-content/50">{expiryText(a.expiration)}</div>
-        )}
-        {a.kind !== 'nft' && (
-          <AtRisk approval={a} usdPrice={usdPrice} />
-        )}
-      </td>
-      <td className="text-right">
-        {isSuccess ? (
-          <span className="text-sm text-success">已撤销</span>
-        ) : (
-          <button
-            className="btn btn-error btn-xs"
-            disabled={!canRevoke || busy}
-            onClick={() => void revoke()}
-            title={canRevoke ? '撤销此授权' : '连接该地址的钱包才能撤销'}
-          >
-            {isSwitching
-              ? '切换网络…'
-              : isPending
-                ? '确认中…'
-                : isConfirming
-                  ? '链上确认中…'
-                  : walletChainId !== chainId && canRevoke
-                    ? `切换到 ${getTxRayChain(chainId).name} 并撤销`
-                    : '撤销'}
-          </button>
-        )}
-        {hash && (
-          <div className="mt-1">
-            <a
-              className="link link-primary text-xs"
-              href={explorerTxUrl(chainId, hash)}
-              rel="noopener noreferrer"
-              target="_blank"
-            >
-              查看交易
-            </a>
-          </div>
-        )}
-        {transactionError && (
-          <div className="mt-1 text-xs text-error">{shortError(transactionError)}</div>
-        )}
-      </td>
-    </tr>
-  );
-}
-
-function RiskBadge({ risk }: { risk?: SpenderRisk }) {
-  if (!risk) {
-    // 风险数据加载中：先用标签兜底
-    return <span className="badge badge-ghost badge-sm">分析中…</span>;
-  }
-  switch (risk.level) {
-    case 'malicious':
-      return <span className="badge badge-error badge-sm">⚠ 已知恶意</span>;
-    case 'eoa':
-      return <span className="badge badge-error badge-sm">⚠ 非合约(EOA)</span>;
-    case 'new':
-      return <span className="badge badge-warning badge-sm">新合约</span>;
-    case 'known':
-      return <span className="badge badge-success badge-sm">{risk.labelName}</span>;
-    default:
-      return <span className="badge badge-warning badge-sm">未知合约</span>;
-  }
-}
-
-function AtRisk({
-  approval,
-  usdPrice,
-}: {
-  approval: Extract<Approval, { kind: 'erc20' | 'permit2' }>;
-  usdPrice?: number;
-}) {
-  const usdValue =
-    typeof usdPrice === 'number'
-      ? Number(approval.atRiskAmountText) * usdPrice
-      : undefined;
-
-  return (
-    <div className="mt-1 text-xs text-base-content/50">
-      暴露：{approval.atRiskAmountText ?? '未知'} {approval.atRiskAmountText ? approval.symbol : ''}
-      {typeof usdValue === 'number' && Number.isFinite(usdValue) && (
-        <span className="ml-1 text-warning">≈ ${formatUsd(usdValue)} at risk</span>
-      )}
-    </div>
-  );
-}
-
-function AddrLink({ addr, chainId }: { addr: string; chainId: number }) {
-  return (
-    <a
-      href={explorerAddressUrl(chainId, addr)}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="link link-hover font-mono text-xs text-base-content/60"
-    >
-      {addr.slice(0, 8)}…{addr.slice(-6)}
-    </a>
-  );
-}
-
-function formatUsd(value: number): string {
-  if (value >= 1000) return value.toLocaleString('en-US', { maximumFractionDigits: 0 });
-  if (value >= 1) return value.toLocaleString('en-US', { maximumFractionDigits: 2 });
-  return value.toLocaleString('en-US', { maximumSignificantDigits: 2 });
-}
-
-function expiryText(exp: number): string {
-  const FAR = 32503680000; // ~ 公元 3000 年，视为永久
-  if (exp > FAR) return '永久';
-  return `到期 ${new Date(exp * 1000).toLocaleDateString('zh-CN')}`;
-}
-
-function shortError(e: Error): string {
-  if (/rejected|denied/i.test(e.message)) return '已取消';
-  return e.message.split('\n')[0].slice(0, 60);
 }
 
 function safeNormalize(name: string): string | undefined {
