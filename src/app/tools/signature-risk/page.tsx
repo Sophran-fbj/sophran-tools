@@ -211,12 +211,19 @@ function AnalysisView({ data }: { data: SignatureAnalysis }) {
       <div className={`alert ${dangerClass(data.danger)}`}>
         <div>
           <div className="font-bold">{riskTitle(t, data.riskKind)}</div>
-          <div className="text-sm">{riskExplain(t, data.riskKind)}</div>
+          <div className="text-sm">
+            {data.signatureExpired ? copy.expiredExplain : riskExplain(t, data.riskKind)}
+          </div>
         </div>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-3">
+      {!data.schemaValidated && (
+        <div className="alert alert-warning text-sm">{copy.schemaFallback}</div>
+      )}
+
+      <div className="grid gap-3 md:grid-cols-4">
         <InfoCard label={copy.domain} value={data.domainName ?? copy.unknown} />
+        <InfoCard label={copy.chainId} value={data.chainId ?? copy.notProvided} />
         <InfoCard label={copy.primaryType} value={data.primaryType ?? copy.unknown} />
         <InfoCard
           label={copy.verifyingContract}
@@ -277,6 +284,9 @@ function FindingRow({ finding }: { finding: FieldFinding }) {
         <span className={`badge badge-sm ${badgeClass(finding.severity)}`}>
           {copy.findingLabels[finding.kind]}
         </span>
+        {finding.path && (
+          <div className="mt-1 font-mono text-xs text-base-content/50">{finding.path}</div>
+        )}
       </td>
       <td className="max-w-sm break-all font-mono text-xs">{finding.value}</td>
       <td className="text-sm text-base-content/70">

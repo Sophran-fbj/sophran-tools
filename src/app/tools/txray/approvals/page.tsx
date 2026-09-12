@@ -6,6 +6,8 @@ import { useSearchParams } from 'next/navigation';
 import {
   useAccount,
   useEnsAddress,
+  usePublicClient,
+  useSwitchChain,
   useWriteContract,
   useWaitForTransactionReceipt,
 } from 'wagmi';
@@ -28,6 +30,7 @@ import {
   DEFAULT_TXRAY_CHAIN_ID,
   TXRAY_CHAINS,
   explorerAddressUrl,
+  explorerTxUrl,
   getTxRayChain,
 } from '@/features/txray/chains/chains';
 import { useTokenPrices } from '@/features/txray/approvals/useTokenPrices';
@@ -56,7 +59,7 @@ export default function ApprovalsPage() {
 function ApprovalsContent() {
   const searchParams = useSearchParams();
   const demoMode = searchParams.get('demo') === '1';
-  const { address: connected } = useAccount();
+  const { address: connected, chainId: walletChainId } = useAccount();
   const [input, setInput] = useState('');
   const [selectedChainId, setSelectedChainId] = useState(DEFAULT_TXRAY_CHAIN_ID);
   const effectiveChainId = demoMode ? DEFAULT_TXRAY_CHAIN_ID : selectedChainId;
@@ -83,7 +86,10 @@ function ApprovalsContent() {
   }
 
   const approvalsQuery = useApprovals(demoMode ? undefined : target, effectiveChainId);
-  const approvals = demoMode ? demoApprovals : approvalsQuery.data;
+  const scanResult = demoMode
+    ? { approvals: demoApprovals, status: 'complete' as const, warnings: [] }
+    : approvalsQuery.data;
+  const approvals = scanResult?.approvals;
   const isLoading = demoMode ? false : approvalsQuery.isLoading;
   const isError = demoMode ? false : approvalsQuery.isError;
   const error = approvalsQuery.error;
@@ -229,7 +235,20 @@ function ApprovalsContent() {
               </div>
             )}
 
-            {approvals && approvals.length === 0 && (
+            {scanResult?.status === 'partial' && (
+              <div className="alert alert-warning mb-4">
+                <div className="text-sm">
+                  <div className="font-bold">扫描结果不完整，不能据此判断该地址安全</div>
+                  <ul className="mt-1 list-disc pl-5">
+                    {scanResult.warnings.map((warning) => (
+                      <li key={warning}>{warning}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )}
+
+            {scanResult?.status === 'complete' && approvals?.length === 0 && (
               <div className="card bg-base-200">
                 <div className="card-body items-center text-center">
                   <p className="text-lg">✅ 很干净</p>
@@ -285,8 +304,10 @@ function ApprovalsContent() {
                         <ApprovalRow
                           key={a.id}
                           a={a}
-                          canRevoke={canRevoke}
-                          chainId={effectiveChainId}
+                           canRevoke={canRevoke}
+                            chainId={effectiveChainId}
+                            connected={connected}
+                            walletChainId={walletChainId}
                           usdPrice={a.kind === 'nft' ? undefined : tokenPrices?.[a.token.toLowerCase()]}
                           risk={riskMap?.[a.spender.toLowerCase()]}
                         />
@@ -311,49 +332,87 @@ function ApprovalRow({
   a,
   canRevoke,
   chainId,
+  connected,
+  walletChainId,
   usdPrice,
   risk,
 }: {
   a: Approval;
   canRevoke: boolean;
   chainId: number;
+  connected?: Address;
+  walletChainId?: number;
   usdPrice?: number;
   risk?: SpenderRisk;
 }) {
   const queryClient = useQueryClient();
-  const { writeContract, data: hash, isPending, error: writeError } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
+  const publicClient = usePublicClient({ chainId });
+  const { switchChainAsync, isPending: isSwitching } = useSwitchChain();
+  const {
+    writeContractAsync,
+    data: hash,
+    isPending,
+    error: writeError,
+    reset: resetWrite,
+  } = useWriteContract();
+  const [prepareError, setPrepareError] = useState<Error>();
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
+    hash,
+    chainId,
+  });
 
   useEffect(() => {
-    if (isSuccess) queryClient.invalidateQueries({ queryKey: ['approvals'] });
-  }, [isSuccess, queryClient]);
+    if (isSuccess) queryClient.invalidateQueries({ queryKey: ['approvals', chainId] });
+  }, [chainId, isSuccess, queryClient]);
 
-  const revoke = () => {
-    if (a.kind === 'erc20') {
-      writeContract({
-        address: a.token,
-        abi: erc20Abi,
-        functionName: 'approve',
-        args: [a.spender, 0n],
-      });
-    } else if (a.kind === 'nft') {
-      writeContract({
-        address: a.token,
-        abi: erc721Abi,
-        functionName: 'setApprovalForAll',
-        args: [a.spender, false],
-      });
-    } else {
-      writeContract({
-        address: PERMIT2_ADDRESS,
-        abi: permit2Abi,
-        functionName: 'approve',
-        args: [a.token, a.spender, 0n, 0],
-      });
+  const revoke = async () => {
+    resetWrite();
+    setPrepareError(undefined);
+    if (!canRevoke || !connected || !publicClient) {
+      setPrepareError(new Error('钱包或目标链 RPC 不可用'));
+      return;
+    }
+
+    try {
+      if (walletChainId !== chainId) {
+        await switchChainAsync({ chainId });
+      }
+
+      if (a.kind === 'erc20') {
+        const { request } = await publicClient.simulateContract({
+          account: connected,
+          address: a.token,
+          abi: erc20Abi,
+          functionName: 'approve',
+          args: [a.spender, 0n],
+        });
+        await writeContractAsync({ ...request, chainId });
+      } else if (a.kind === 'nft') {
+        const { request } = await publicClient.simulateContract({
+          account: connected,
+          address: a.token,
+          abi: erc721Abi,
+          functionName: 'setApprovalForAll',
+          args: [a.spender, false],
+        });
+        await writeContractAsync({ ...request, chainId });
+      } else {
+        const { request } = await publicClient.simulateContract({
+          account: connected,
+          address: PERMIT2_ADDRESS,
+          abi: permit2Abi,
+          functionName: 'approve',
+          args: [a.token, a.spender, 0n, 0],
+        });
+        await writeContractAsync({ ...request, chainId });
+      }
+    } catch (error) {
+      setPrepareError(error instanceof Error ? error : new Error('撤销交易准备失败'));
     }
   };
 
-  const busy = isPending || isConfirming;
+  const busy = isSwitching || isPending || isConfirming;
+  const transactionError = prepareError ?? writeError;
 
   return (
     <tr>
@@ -398,14 +457,34 @@ function ApprovalRow({
           <button
             className="btn btn-error btn-xs"
             disabled={!canRevoke || busy}
-            onClick={revoke}
+            onClick={() => void revoke()}
             title={canRevoke ? '撤销此授权' : '连接该地址的钱包才能撤销'}
           >
-            {isPending ? '确认中…' : isConfirming ? '撤销中…' : '撤销'}
+            {isSwitching
+              ? '切换网络…'
+              : isPending
+                ? '确认中…'
+                : isConfirming
+                  ? '链上确认中…'
+                  : walletChainId !== chainId && canRevoke
+                    ? `切换到 ${getTxRayChain(chainId).name} 并撤销`
+                    : '撤销'}
           </button>
         )}
-        {writeError && (
-          <div className="mt-1 text-xs text-error">{shortError(writeError)}</div>
+        {hash && (
+          <div className="mt-1">
+            <a
+              className="link link-primary text-xs"
+              href={explorerTxUrl(chainId, hash)}
+              rel="noopener noreferrer"
+              target="_blank"
+            >
+              查看交易
+            </a>
+          </div>
+        )}
+        {transactionError && (
+          <div className="mt-1 text-xs text-error">{shortError(transactionError)}</div>
         )}
       </td>
     </tr>
@@ -445,7 +524,7 @@ function AtRisk({
 
   return (
     <div className="mt-1 text-xs text-base-content/50">
-      暴露：{approval.atRiskAmountText} {approval.symbol}
+      暴露：{approval.atRiskAmountText ?? '未知'} {approval.atRiskAmountText ? approval.symbol : ''}
       {typeof usdValue === 'number' && Number.isFinite(usdValue) && (
         <span className="ml-1 text-warning">≈ ${formatUsd(usdValue)} at risk</span>
       )}

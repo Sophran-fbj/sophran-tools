@@ -11,7 +11,10 @@ export async function register() {
   try {
     const { setGlobalDispatcher, ProxyAgent } = await import('undici');
     setGlobalDispatcher(new ProxyAgent(proxy));
-    console.log(`[instrumentation] 服务端 fetch 已走代理：${proxy}`);
+    const proxyUrl = new URL(proxy);
+    console.log(
+      `[instrumentation] 服务端 fetch 已启用代理：${proxyUrl.protocol}//${proxyUrl.host}`,
+    );
   } catch (e) {
     console.error('[instrumentation] 代理设置失败：', e);
   }

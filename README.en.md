@@ -22,7 +22,7 @@ TxRay focuses on **detect + explain**:
 
 ### TxRay · Approval Check
 
-- Read ERC-20, ERC-721, and Permit2 approval history through a server-side Etherscan indexer route.
+- Read ERC-20, ERC-721, and Permit2 approval history through a server-side Etherscan indexer route; explicitly mark results incomplete when the pagination budget is reached.
 - Verify current allowances with viem multicall, so stale historical approvals are filtered out.
 - Detect unlimited ERC-20 allowances.
 - Detect NFT `setApprovalForAll` collection-level approvals.
@@ -34,8 +34,8 @@ TxRay focuses on **detect + explain**:
   - EOA spenders,
   - newly deployed unknown contracts,
   - unknown contracts,
-  - blocklist-ready malicious addresses.
-- Revoke ERC-20, NFT, and Permit2 approvals through the connected wallet.
+  - chain-scoped known-contract labels; the project does not currently claim live malicious-address intelligence.
+- Revoke ERC-20, NFT, and Permit2 approvals after enforcing the target chain and simulating the write.
 - Demo mode: `/tools/txray/approvals?demo=1`.
 
 ### TxRay · Transaction Decoder
@@ -141,6 +141,14 @@ Example `DEV_PROXY`:
 ```env
 DEV_PROXY=http://127.0.0.1:10808
 ```
+
+Without `NEXT_PUBLIC_WC_PROJECT_ID`, local builds still work with injected browser wallets only. Production should provide a real, domain-restricted Project ID.
+
+## Known Limitations
+
+- Etherscan log scans are capped at 10,000 records per event class. Reaching the cap produces an explicit incomplete-scan warning and never a clean result.
+- Trusted spender labels currently apply only to Ethereum mainnet; other chains default to unknown.
+- Signature Risk expands structures and arrays from EIP-712 `types`. Without a schema, it performs conservative field scanning and displays a limitation warning.
 
 ## Verification
 

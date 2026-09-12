@@ -1,30 +1,108 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { isAddress, getAddress, toEventSelector } from 'viem';
+import { getAddress, isAddress, toEventSelector } from 'viem';
 import {
   PERMIT2_ADDRESS,
   PERMIT2_APPROVAL_EVENT,
   PERMIT2_PERMIT_EVENT,
 } from '@/features/txray/approvals/permit2';
 import { isSupportedTxRayChain } from '@/features/txray/chains/chains';
+import {
+  checkRateLimit,
+  requestClientKey,
+  scheduleExternalRequest,
+} from '@/lib/server/requestGuard';
 
-// keccak256("Approval(address,address,uint256)")
 const APPROVAL_TOPIC0 =
   '0x8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925';
-// keccak256("ApprovalForAll(address,address,bool)")
 const APPROVAL_FOR_ALL_TOPIC0 =
   '0x17307eab39ab6107e8899845ad3d59bd9653f200f220920489ca2b5937696c31';
-// Permit2 事件 topic0：运行时计算，避免硬编码出错
 const PERMIT2_APPROVAL_TOPIC0 = toEventSelector(PERMIT2_APPROVAL_EVENT);
 const PERMIT2_PERMIT_TOPIC0 = toEventSelector(PERMIT2_PERMIT_EVENT);
 
 const ETHERSCAN_BASE = 'https://api.etherscan.io/v2/api';
+const PAGE_SIZE = 1000;
+const MAX_PAGES_PER_SOURCE = 10;
+const UPSTREAM_TIMEOUT_MS = 12_000;
+const CACHE_TTL_MS = 60_000;
 
 interface EtherscanLog {
   address: string;
   topics: string[];
 }
 
-const topicToAddress = (t: string) => getAddress(`0x${t.slice(-40)}`);
+interface Pair {
+  token: string;
+  spender: string;
+}
+
+interface LogPageResult {
+  logs: EtherscanLog[];
+  truncated: boolean;
+}
+
+interface ApprovalIndexResponse {
+  erc20: Pair[];
+  nft: Pair[];
+  permit2: Pair[];
+  coverage: {
+    status: 'complete' | 'partial';
+    truncatedSources: string[];
+    maxRecordsPerSource: number;
+  };
+}
+
+const responseCache = new Map<
+  string,
+  { expiresAt: number; value: ApprovalIndexResponse }
+>();
+const inFlight = new Map<string, Promise<ApprovalIndexResponse>>();
+
+function topicToAddress(topic: string): string {
+  return getAddress(`0x${topic.slice(-40)}`);
+}
+
+function isEtherscanLog(value: unknown): value is EtherscanLog {
+  if (!value || typeof value !== 'object') return false;
+  const log = value as Record<string, unknown>;
+  return (
+    typeof log.address === 'string' &&
+    isAddress(log.address) &&
+    Array.isArray(log.topics) &&
+    log.topics.every((topic) => typeof topic === 'string')
+  );
+}
+
+function upstreamMessage(value: unknown): string {
+  if (!value || typeof value !== 'object') return '';
+  const json = value as Record<string, unknown>;
+  if (typeof json.result === 'string') return json.result;
+  return typeof json.message === 'string' ? json.message : '';
+}
+
+async function fetchLogPage(url: URL): Promise<EtherscanLog[]> {
+  const response = await scheduleExternalRequest(() =>
+    fetch(url, {
+      cache: 'no-store',
+      signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
+    }),
+  );
+  if (!response.ok) throw new Error(`Etherscan HTTP ${response.status}`);
+
+  const json: unknown = await response.json();
+  if (json && typeof json === 'object') {
+    const result = (json as Record<string, unknown>).result;
+    if (Array.isArray(result)) {
+      if (!result.every(isEtherscanLog)) {
+        throw new Error('Etherscan 返回了无效日志数据');
+      }
+      return result;
+    }
+  }
+
+  const message = upstreamMessage(json);
+  if (/no records found/i.test(message)) return [];
+  throw new Error(message || 'Etherscan 查询失败');
+}
 
 async function fetchAllLogs(
   chainId: number,
@@ -32,12 +110,10 @@ async function fetchAllLogs(
   ownerTopic: string,
   apiKey: string,
   contractAddress?: string,
-): Promise<EtherscanLog[]> {
-  const offset = 1000;
-  const maxPages = 10;
-  const all: EtherscanLog[] = [];
+): Promise<LogPageResult> {
+  const logs: EtherscanLog[] = [];
 
-  for (let page = 1; page <= maxPages; page++) {
+  for (let page = 1; page <= MAX_PAGES_PER_SOURCE; page += 1) {
     const url = new URL(ETHERSCAN_BASE);
     url.searchParams.set('chainid', String(chainId));
     url.searchParams.set('module', 'logs');
@@ -49,94 +125,161 @@ async function fetchAllLogs(
     url.searchParams.set('fromBlock', '0');
     url.searchParams.set('toBlock', 'latest');
     url.searchParams.set('page', String(page));
-    url.searchParams.set('offset', String(offset));
+    url.searchParams.set('offset', String(PAGE_SIZE));
     url.searchParams.set('apikey', apiKey);
 
-    const res = await fetch(url, { cache: 'no-store' });
-    const json = await res.json();
+    const pageLogs = await fetchLogPage(url);
+    logs.push(...pageLogs);
+    if (pageLogs.length < PAGE_SIZE) return { logs, truncated: false };
+  }
 
-    if (Array.isArray(json.result)) {
-      all.push(...(json.result as EtherscanLog[]));
-      if (json.result.length < offset) break;
-    } else {
-      const msg = typeof json.result === 'string' ? json.result : json.message;
-      if (msg && /no records found/i.test(msg)) break;
-      throw new Error(msg || 'Etherscan 查询失败');
+  return { logs, truncated: true };
+}
+
+function dedupeSpenderPairs(logs: EtherscanLog[]): Pair[] {
+  const pairs = new Map<string, Pair>();
+  for (const log of logs) {
+    const spenderTopic = log.topics[2];
+    if (!spenderTopic) continue;
+    try {
+      const token = getAddress(log.address);
+      const spender = topicToAddress(spenderTopic);
+      pairs.set(`${token.toLowerCase()}-${spender.toLowerCase()}`, { token, spender });
+    } catch {
+      // Ignore malformed individual logs, while retaining all valid results.
     }
   }
-  return all;
+  return [...pairs.values()];
 }
 
-// ERC20/NFT：topic1=owner, topic2=spender
-function dedupeSpenderPairs(logs: EtherscanLog[]) {
-  const map = new Map<string, { token: string; spender: string }>();
+function dedupePermit2Pairs(logs: EtherscanLog[]): Pair[] {
+  const pairs = new Map<string, Pair>();
   for (const log of logs) {
-    const spenderTopic = log.topics?.[2];
-    if (!spenderTopic) continue;
-    const token = getAddress(log.address);
-    const spender = topicToAddress(spenderTopic);
-    map.set(`${token}-${spender}`, { token, spender });
-  }
-  return [...map.values()];
-}
-
-// Permit2：topic1=owner, topic2=token, topic3=spender
-function dedupePermit2Pairs(logs: EtherscanLog[]) {
-  const map = new Map<string, { token: string; spender: string }>();
-  for (const log of logs) {
-    const tokenTopic = log.topics?.[2];
-    const spenderTopic = log.topics?.[3];
+    const tokenTopic = log.topics[2];
+    const spenderTopic = log.topics[3];
     if (!tokenTopic || !spenderTopic) continue;
-    const token = topicToAddress(tokenTopic);
-    const spender = topicToAddress(spenderTopic);
-    map.set(`${token}-${spender}`, { token, spender });
+    try {
+      const token = topicToAddress(tokenTopic);
+      const spender = topicToAddress(spenderTopic);
+      pairs.set(`${token.toLowerCase()}-${spender.toLowerCase()}`, { token, spender });
+    } catch {
+      // Ignore malformed individual logs, while retaining all valid results.
+    }
   }
-  return [...map.values()];
+  return [...pairs.values()];
 }
 
-export async function GET(req: NextRequest) {
+async function scanApprovals(
+  owner: string,
+  chainId: number,
+  apiKey: string,
+): Promise<ApprovalIndexResponse> {
+  const ownerTopic = `0x${owner.slice(2).toLowerCase().padStart(64, '0')}`;
+  const sources = [
+    ['erc20', APPROVAL_TOPIC0, undefined],
+    ['nft', APPROVAL_FOR_ALL_TOPIC0, undefined],
+    ['permit2Approval', PERMIT2_APPROVAL_TOPIC0, PERMIT2_ADDRESS],
+    ['permit2Permit', PERMIT2_PERMIT_TOPIC0, PERMIT2_ADDRESS],
+  ] as const;
+
+  const results: Record<(typeof sources)[number][0], LogPageResult> = {
+    erc20: { logs: [], truncated: false },
+    nft: { logs: [], truncated: false },
+    permit2Approval: { logs: [], truncated: false },
+    permit2Permit: { logs: [], truncated: false },
+  };
+
+  // Sequential requests avoid bursting through Etherscan's per-key rate limit.
+  for (const [name, topic, contract] of sources) {
+    results[name] = await fetchAllLogs(chainId, topic, ownerTopic, apiKey, contract);
+  }
+
+  const truncatedSources = sources
+    .filter(([name]) => results[name].truncated)
+    .map(([name]) => name);
+
+  return {
+    erc20: dedupeSpenderPairs(results.erc20.logs),
+    nft: dedupeSpenderPairs(results.nft.logs),
+    permit2: dedupePermit2Pairs([
+      ...results.permit2Approval.logs,
+      ...results.permit2Permit.logs,
+    ]),
+    coverage: {
+      status: truncatedSources.length ? 'partial' : 'complete',
+      truncatedSources,
+      maxRecordsPerSource: PAGE_SIZE * MAX_PAGES_PER_SOURCE,
+    },
+  };
+}
+
+export async function GET(request: NextRequest) {
   const apiKey = process.env.ETHERSCAN_API_KEY;
   if (!apiKey) {
     return NextResponse.json(
-      { error: 'ETHERSCAN_API_KEY 未配置，请在 .env.local 填入后重启 dev' },
-      { status: 500 },
+      { error: { code: 'CONFIG_MISSING', message: '服务端未配置 Etherscan API key' } },
+      { status: 503 },
     );
   }
 
-  const ownerParam = req.nextUrl.searchParams.get('owner');
-  const chainId = Number(req.nextUrl.searchParams.get('chainId') ?? '1');
+  const rateLimit = checkRateLimit(
+    `approvals:${requestClientKey(request.headers)}`,
+    8,
+    60_000,
+  );
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { error: { code: 'RATE_LIMITED', message: '请求过于频繁，请稍后重试' } },
+      {
+        status: 429,
+        headers: { 'Retry-After': String(rateLimit.retryAfterSeconds) },
+      },
+    );
+  }
+
+  const ownerParam = request.nextUrl.searchParams.get('owner');
+  const chainId = Number(request.nextUrl.searchParams.get('chainId') ?? '1');
   if (!isSupportedTxRayChain(chainId)) {
-    return NextResponse.json({ error: '暂不支持该链' }, { status: 400 });
+    return NextResponse.json(
+      { error: { code: 'UNSUPPORTED_CHAIN', message: '暂不支持该链' } },
+      { status: 400 },
+    );
   }
   if (!ownerParam || !isAddress(ownerParam)) {
-    return NextResponse.json({ error: '无效地址' }, { status: 400 });
+    return NextResponse.json(
+      { error: { code: 'INVALID_ADDRESS', message: '无效地址' } },
+      { status: 400 },
+    );
   }
 
-  const ownerTopic = `0x${ownerParam.slice(2).toLowerCase().padStart(64, '0')}`;
+  const owner = getAddress(ownerParam);
+  const cacheKey = `${chainId}:${owner.toLowerCase()}`;
+  const cached = responseCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) {
+    return NextResponse.json(cached.value, {
+      headers: { 'Cache-Control': 'public, max-age=30, s-maxage=60' },
+    });
+  }
 
   try {
-    const [erc20Logs, nftLogs, p2ApprovalLogs, p2PermitLogs] = await Promise.all([
-      fetchAllLogs(chainId, APPROVAL_TOPIC0, ownerTopic, apiKey),
-      fetchAllLogs(chainId, APPROVAL_FOR_ALL_TOPIC0, ownerTopic, apiKey),
-      fetchAllLogs(chainId, PERMIT2_APPROVAL_TOPIC0, ownerTopic, apiKey, PERMIT2_ADDRESS),
-      fetchAllLogs(chainId, PERMIT2_PERMIT_TOPIC0, ownerTopic, apiKey, PERMIT2_ADDRESS),
-    ]);
-    return NextResponse.json({
-      erc20: dedupeSpenderPairs(erc20Logs),
-      nft: dedupeSpenderPairs(nftLogs),
-      permit2: dedupePermit2Pairs([...p2ApprovalLogs, ...p2PermitLogs]),
+    let pending = inFlight.get(cacheKey);
+    if (!pending) {
+      pending = scanApprovals(owner, chainId, apiKey);
+      inFlight.set(cacheKey, pending);
+    }
+    const value = await pending;
+    responseCache.set(cacheKey, { expiresAt: Date.now() + CACHE_TTL_MS, value });
+    return NextResponse.json(value, {
+      headers: { 'Cache-Control': 'public, max-age=30, s-maxage=60' },
     });
-  } catch (e) {
-    const err = e as Error & { cause?: unknown };
-    const causeMsg =
-      err.cause instanceof Error
-        ? err.cause.message
-        : err.cause
-          ? String(err.cause)
-          : '';
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '上游查询失败';
+    console.error('[approvals] upstream scan failed', { chainId, owner, message });
     return NextResponse.json(
-      { error: `${err.message}${causeMsg ? ` — ${causeMsg}` : ''}` },
+      { error: { code: 'UPSTREAM_FAILED', message: '授权索引服务暂时不可用，请稍后重试' } },
       { status: 502 },
     );
+  } finally {
+    inFlight.delete(cacheKey);
   }
 }

@@ -7,7 +7,7 @@ export interface SpenderLabel {
 
 // 常见合约标签（地址用小写）。这是「内容资产」，可持续扩充或日后接公开标签库。
 // 命中 = 显示名称 + 可信标记；未命中 = 「未知合约」黄色警示（风险更高）。
-const LABELS: Record<string, SpenderLabel> = {
+const MAINNET_LABELS: Record<string, SpenderLabel> = {
   // Uniswap
   '0x7a250d5630b4cf539739df2c5dacb4c659f2488d': { name: 'Uniswap V2 Router', trusted: true },
   '0xe592427a0aece92de3edee1f18e0157c05861564': { name: 'Uniswap V3 Router', trusted: true },
@@ -24,6 +24,13 @@ const LABELS: Record<string, SpenderLabel> = {
   '0x000000000000ad05ccc4f10045630fb830b95127': { name: 'Blur Marketplace', trusted: true },
 };
 
-export function getSpenderLabel(addr: Address): SpenderLabel | undefined {
-  return LABELS[addr.toLowerCase()];
+const LABELS_BY_CHAIN: Partial<Record<number, Record<string, SpenderLabel>>> = {
+  1: MAINNET_LABELS,
+};
+
+export function getSpenderLabel(
+  addr: Address,
+  chainId = 1,
+): SpenderLabel | undefined {
+  return LABELS_BY_CHAIN[chainId]?.[addr.toLowerCase()];
 }

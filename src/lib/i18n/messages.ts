@@ -58,6 +58,9 @@ export const messages = {
       fields: '安全关键字段',
       noFields:
         '未检测到常见 permit 或 operator 字段。签名前仍需检查原始 message。',
+      schemaFallback: '缺少完整 types schema；当前结果使用保守字段扫描，不能视为完整解析。',
+      expiredExplain: '签名截止时间已经过去，这段 payload 应无法再成功执行。',
+      chainId: 'Chain ID',
       field: '字段',
       value: '值',
       why: '为什么重要',
@@ -165,6 +168,10 @@ export const messages = {
       fields: 'Security-relevant fields',
       noFields:
         'No common permit or operator fields were detected. Inspect the raw message before signing.',
+      schemaFallback:
+        'A complete types schema is missing. This result uses conservative field scanning and is not a complete parse.',
+      expiredExplain: 'The signature deadline has passed, so this payload should no longer execute.',
+      chainId: 'Chain ID',
       field: 'Field',
       value: 'Value',
       why: 'Why it matters',

@@ -22,7 +22,7 @@ TxRay 的核心是 **检测 + 解释**：
 
 ### TxRay · 授权检查
 
-- 通过服务端 Etherscan 索引器路由读取 ERC-20、ERC-721 和 Permit2 授权历史。
+- 通过服务端 Etherscan 索引器路由读取 ERC-20、ERC-721 和 Permit2 授权历史；达到分页预算时明确标记为不完整，绝不把截断结果描述为安全。
 - 用 viem multicall 校验当前授权额度，过滤已经失效的历史授权。
 - 检测 ERC-20 无限授权。
 - 检测 NFT `setApprovalForAll` 整集合授权。
@@ -34,8 +34,8 @@ TxRay 的核心是 **检测 + 解释**：
   - EOA spender；
   - 新部署的未知合约；
   - 未知合约；
-  - 可持续补充的恶意地址黑名单。
-- 通过已连接钱包撤销 ERC-20、NFT 和 Permit2 授权。
+  - 链级隔离的已知合约标签；当前不宣称提供实时恶意地址情报。
+- 通过已连接钱包撤销 ERC-20、NFT 和 Permit2 授权；写入前强制匹配目标链并执行合约 simulation。
 - 演示模式：`/tools/txray/approvals?demo=1`。
 
 ### TxRay · 交易解码
@@ -141,6 +141,14 @@ pnpm dev
 ```env
 DEV_PROXY=http://127.0.0.1:10808
 ```
+
+本地未配置 `NEXT_PUBLIC_WC_PROJECT_ID` 时仍可构建，并只启用浏览器注入钱包；生产环境应配置真实且限制域名的 Project ID。
+
+## 已知限制
+
+- Etherscan 日志查询每类事件最多扫描 10,000 条；达到上限时页面显示“不完整扫描”，不会显示“很干净”。
+- spender 可信标签目前只对 Ethereum 主网地址生效；其他链默认按未知合约处理。
+- Signature Risk 会按 EIP-712 `types` 展开结构和数组；缺少 schema 时仅做保守字段扫描，并在页面明确提示。
 
 ## 验证
 

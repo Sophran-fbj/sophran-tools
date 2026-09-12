@@ -58,3 +58,7 @@ export function isSupportedTxRayChain(chainId: number): boolean {
 export function explorerAddressUrl(chainId: number, address: string): string {
   return `${getTxRayChain(chainId).explorerUrl}/address/${address}`;
 }
+
+export function explorerTxUrl(chainId: number, hash: string): string {
+  return `${getTxRayChain(chainId).explorerUrl}/tx/${hash}`;
+}

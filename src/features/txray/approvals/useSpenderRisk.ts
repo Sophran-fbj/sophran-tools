@@ -24,12 +24,13 @@ const NEW_CONTRACT_DAYS = 30;
 
 export function classifySpenderRisk(input: {
   address: Address;
+  chainId?: number;
   isEoa: boolean;
   createdAt?: number;
   now: number;
 }): SpenderRisk {
   const address = input.address.toLowerCase();
-  const label = getSpenderLabel(input.address);
+  const label = getSpenderLabel(input.address, input.chainId ?? 1);
 
   let level: RiskLevel;
   let reason: string;
@@ -86,23 +87,44 @@ async function fetchSpenderRisk(
   ] as Address[];
 
   // 1) EOA 检测：有没有合约代码（eth_getCode）
-  const codes = await Promise.all(
-    unique.map((a) => client.getCode({ address: a }).catch(() => undefined)),
-  );
+  const codes: Array<`0x${string}` | undefined> = [];
+  for (let index = 0; index < unique.length; index += 20) {
+    const chunk = unique.slice(index, index + 20);
+    codes.push(
+      ...(await Promise.all(
+        chunk.map((address) =>
+          client.getCode({ address }).catch(() => undefined),
+        ),
+      )),
+    );
+  }
   const isEoa: Record<string, boolean> = {};
   unique.forEach((a, i) => {
     isEoa[a] = !codes[i] || codes[i] === '0x';
   });
 
   // 2) 合约部署时间（服务端 Etherscan）
-  let createdMap: Record<string, number | null> = {};
-  try {
-    const r = await fetch(
-      `/api/spender-info?chainId=${chainId}&addresses=${unique.join(',')}`,
-    );
-    if (r.ok) createdMap = (await r.json()).created ?? {};
-  } catch {
-    // 拿不到部署时间不致命，只是少一个信号
+  const createdMap: Record<string, number | null> = {};
+  for (let index = 0; index < unique.length; index += 25) {
+    const chunk = unique.slice(index, index + 25);
+    try {
+      const response = await fetch(
+        `/api/spender-info?chainId=${chainId}&addresses=${chunk.join(',')}`,
+      );
+      if (!response.ok) continue;
+      const json: unknown = await response.json();
+      if (!json || typeof json !== 'object') continue;
+      const created = (json as Record<string, unknown>).created;
+      if (created && typeof created === 'object' && !Array.isArray(created)) {
+        for (const [address, timestamp] of Object.entries(created)) {
+          if (timestamp === null || typeof timestamp === 'number') {
+            createdMap[address] = timestamp;
+          }
+        }
+      }
+    } catch {
+      // Deployment age is an optional signal; code presence remains authoritative.
+    }
   }
 
   // 3) 综合风险
@@ -111,7 +133,13 @@ async function fetchSpenderRisk(
   for (const a of unique) {
     const eoa = isEoa[a];
     const createdAt = createdMap[a] ?? undefined;
-    out[a] = classifySpenderRisk({ address: a, isEoa: eoa, createdAt, now });
+    out[a] = classifySpenderRisk({
+      address: a,
+      chainId,
+      isEoa: eoa,
+      createdAt,
+      now,
+    });
   }
   return out;
 }
