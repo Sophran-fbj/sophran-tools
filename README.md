@@ -4,6 +4,8 @@
 
 > 一个不只检测链上风险，也解释风险原因的 web3 工具站。
 
+**在线体验：** [https://sophran-tools.vercel.app](https://sophran-tools.vercel.app)
+
 `sophran-tools` 是 Sophran 的 web3 工具站。当前包含 **TxRay** 和 **Signature Risk**：前者用于检查授权和解码交易，后者用于分析 EIP-712 签名风险。
 
 这些工具关注真实的用户安全场景：钱包连接、索引化链上数据、RPC 读取、multicall、calldata 解码、Permit2 授权分析、EIP-712 typed data 检查，以及面向用户的人话解释。
@@ -77,7 +79,7 @@ TxRay 的核心是 **检测 + 解释**：
 | 链交互 | wagmi 2 + viem 2 |
 | 查询/缓存 | TanStack Query |
 | UI | Tailwind CSS 4 + DaisyUI 5 |
-| 测试 | Vitest |
+| 测试 | Vitest + Playwright |
 | 包管理 | pnpm |
 
 ## 架构
@@ -159,9 +161,10 @@ pnpm lint
 pnpm typecheck
 pnpm test
 pnpm build
+pnpm e2e
 ```
 
-GitHub Actions 会在 push 和 pull request 上执行同一组检查。
+首次运行 E2E 前执行 `pnpm exec playwright install chromium`。GitHub Actions 会在 push 和 pull request 上执行同一组检查。
 
 ## 后续方向
 
@@ -169,7 +172,6 @@ GitHub Actions 会在 push 和 pull request 上执行同一组检查。
 - 在 Ethereum / Base / Arbitrum / Optimism 稳定后继续扩展更多链。
 - 改进 `$ at risk` 的缓存和价格覆盖。
 - 内容增长后，将文章系统升级为 MDX。
-- 公开部署后补充线上地址。
 
 ## License
 

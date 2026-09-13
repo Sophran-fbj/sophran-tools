@@ -10,7 +10,8 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "check": "pnpm typecheck && pnpm lint && pnpm test && pnpm build"
+    "e2e": "playwright test",
+    "check": "tsc --noEmit && eslint && vitest run && next build && playwright test"
   },
   "dependencies": {
     "@rainbow-me/rainbowkit": "^2.2.11",
@@ -23,6 +24,7 @@
     "wagmi": "^2.19.5"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

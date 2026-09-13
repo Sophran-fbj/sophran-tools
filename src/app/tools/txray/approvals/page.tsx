@@ -21,17 +21,24 @@ import {
 } from '@/features/txray/chains/chains';
 import { useTokenPrices } from '@/features/txray/approvals/useTokenPrices';
 import { ApprovalRow } from '@/features/txray/approvals/ApprovalRow';
+import { LanguageToggle } from '@/components/LanguageToggle';
+import { useI18n } from '@/lib/i18n/provider';
+import type { ApprovalWarning } from '@/features/txray/approvals/types';
 
 export default function ApprovalsPage() {
+  const { t } = useI18n();
   return (
     <Suspense
       fallback={
-        <main className="min-h-screen bg-base-100 px-6 py-12">
+        <main className="min-h-screen bg-base-100 px-4 py-8 sm:px-6 sm:py-12">
           <div className="mx-auto max-w-4xl">
             <div className="card bg-base-200">
-              <div className="card-body items-center gap-3 text-base-content/60">
-                <span className="loading loading-spinner loading-md text-primary" />
-                <span>加载授权检查器…</span>
+              <div className="card-body items-center gap-3 text-base-content/70">
+                <span
+                  className="loading loading-spinner loading-md text-primary"
+                  aria-hidden="true"
+                />
+                <span>{t.approvals.loadingPage}</span>
               </div>
             </div>
           </div>
@@ -44,6 +51,7 @@ export default function ApprovalsPage() {
 }
 
 function ApprovalsContent() {
+  const { t } = useI18n();
   const searchParams = useSearchParams();
   const demoMode = searchParams.get('demo') === '1';
   const { address: connected, chainId: walletChainId } = useAccount();
@@ -67,7 +75,7 @@ function ApprovalsContent() {
   if (trimmed) {
     if (isAddress(trimmed)) target = getAddress(trimmed);
     else if (looksLikeEns) target = ensResolved ?? undefined;
-    else inputError = '请输入合法地址（0x…）或 ENS 域名（xxx.eth）';
+    else inputError = t.approvals.invalidAddress;
   } else {
     target = demoMode ? DEMO_OWNER : connected;
   }
@@ -79,7 +87,6 @@ function ApprovalsContent() {
   const approvals = scanResult?.approvals;
   const isLoading = demoMode ? false : approvalsQuery.isLoading;
   const isError = demoMode ? false : approvalsQuery.isError;
-  const error = approvalsQuery.error;
 
   // 唯一 spender 列表 → 风险画像
   const spenders = useMemo(
@@ -110,41 +117,46 @@ function ApprovalsContent() {
   const hasPermit2 = approvals?.some((a) => a.kind === 'permit2');
 
   return (
-    <main className="min-h-screen bg-base-100 px-6 py-12">
+    <main className="min-h-screen bg-base-100 px-4 py-8 sm:px-6 sm:py-12">
       <div className="mx-auto max-w-4xl">
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <Link
               href="/tools/txray"
-              className="text-sm text-base-content/60 hover:text-base-content"
+              className="rounded-sm text-sm text-base-content/70 hover:text-base-content focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
             >
               ← TxRay
             </Link>
-            <h1 className="mt-2 text-3xl font-bold text-primary">授权检查</h1>
-            <p className="mt-1 text-sm text-base-content/60">
-              当前网络：{chain.name}
+            <h1 className="mt-2 text-3xl font-bold text-primary">
+              {t.approvals.title}
+            </h1>
+            <p className="mt-1 text-sm text-base-content/70">
+              {t.approvals.currentNetwork(chain.name)}
             </p>
           </div>
-          <WalletButton />
+          <div className="flex items-center gap-2 self-end sm:self-auto">
+            <LanguageToggle />
+            <WalletButton />
+          </div>
         </div>
 
         {demoMode && (
           <div className="alert alert-info mt-6 text-sm">
             <span>
-              演示模式：这里展示的是内置样例，不会读取链上数据，也不会发起撤销交易。
-              用它可以快速看出 TxRay 如何解释无限授权、Permit2 和 EOA spender 风险。
+              {t.approvals.demo}
             </span>
           </div>
         )}
 
         <div className="form-control mt-8">
-          <label className="label">
-            <span className="label-text">网络</span>
-            <span className="label-text-alt text-base-content/50">
-              支持 Ethereum / Base / Arbitrum / Optimism
+          <label className="label" htmlFor="approval-network">
+            <span className="label-text">{t.approvals.network}</span>
+            <span className="label-text-alt text-base-content/70">
+              {t.approvals.supportedNetworks}
             </span>
           </label>
           <select
+            id="approval-network"
             className="select select-bordered w-full"
             disabled={demoMode}
             value={effectiveChainId}
@@ -159,45 +171,52 @@ function ApprovalsContent() {
         </div>
 
         <div className="form-control mt-4">
-          <label className="label">
-            <span className="label-text">查询地址</span>
-            <span className="label-text-alt text-base-content/50">
-              留空则查询已连接的钱包
+          <label className="label" htmlFor="approval-address">
+            <span className="label-text">{t.approvals.queryAddress}</span>
+            <span className="label-text-alt text-base-content/70">
+              {t.approvals.queryAddressHint}
             </span>
           </label>
           <input
+            id="approval-address"
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="0x… 或 vitalik.eth"
+            placeholder={t.approvals.addressPlaceholder}
             className="input input-bordered w-full font-mono"
             spellCheck={false}
           />
           {inputError && (
-            <span className="mt-1 text-sm text-error">{inputError}</span>
+            <span className="mt-1 text-sm text-error" role="alert">{inputError}</span>
           )}
           {looksLikeEns && ensLoading && (
-            <span className="mt-1 text-sm text-base-content/50">解析 ENS 中…</span>
+            <span className="mt-1 text-sm text-base-content/70" role="status">
+              {t.approvals.resolvingEns}
+            </span>
           )}
           {looksLikeEns && !ensLoading && !ensResolved && (
-            <span className="mt-1 text-sm text-warning">无法解析该 ENS 域名</span>
+            <span className="mt-1 text-sm text-warning" role="alert">
+              {t.approvals.ensFailed}
+            </span>
           )}
         </div>
 
         {target ? (
           <div className="alert mt-6">
             <span className="text-sm">
-              正在查询：
+              {t.approvals.querying}
               <span className="ml-1 break-all font-mono text-primary">{target}</span>
               {!trimmed && connected && (
-                <span className="badge badge-sm ml-2">已连接钱包</span>
+                <span className="badge badge-sm ml-2">
+                  {t.approvals.connectedWallet}
+                </span>
               )}
             </span>
           </div>
         ) : (
           <div className="alert alert-info mt-6">
             <span className="text-sm">
-              连接钱包，或在上方粘贴一个地址 / ENS 开始查询。
+              {t.approvals.startHint}
             </span>
           </div>
         )}
@@ -205,33 +224,38 @@ function ApprovalsContent() {
         {target && (
           <div className="mt-6">
             {isLoading && (
-              <div className="card bg-base-200">
-                <div className="card-body items-center gap-3 text-base-content/60">
-                  <span className="loading loading-spinner loading-md text-primary" />
-                  <span>扫描链上授权中…（含 Permit2，全历史事件 + multicall 校验）</span>
+              <div className="card bg-base-200" role="status">
+                <div className="card-body items-center gap-3 text-base-content/70">
+                  <span
+                    className="loading loading-spinner loading-md text-primary"
+                    aria-hidden="true"
+                  />
+                  <span>{t.approvals.scanning}</span>
                 </div>
               </div>
             )}
 
             {isError && (
-              <div className="alert alert-error">
+              <div className="alert alert-error" role="alert">
                 <span className="text-sm">
-                  查询失败：{error?.message ?? '未知错误'}
+                  {t.approvals.queryFailed}
                   <br />
                   <span className="text-xs opacity-80">
-                    “fetch failed” 多为服务端连不上 Etherscan（网络/代理问题）；请看 dev 终端的详细报错。
+                    {t.approvals.queryFailedDetail}
                   </span>
                 </span>
               </div>
             )}
 
             {scanResult?.status === 'partial' && (
-              <div className="alert alert-warning mb-4">
+              <div className="alert alert-warning mb-4" role="alert">
                 <div className="text-sm">
-                  <div className="font-bold">扫描结果不完整，不能据此判断该地址安全</div>
+                  <div className="font-bold">{t.approvals.partialTitle}</div>
                   <ul className="mt-1 list-disc pl-5">
                     {scanResult.warnings.map((warning) => (
-                      <li key={warning}>{warning}</li>
+                      <li key={warning.code}>
+                        {formatApprovalWarning(warning, t.approvals)}
+                      </li>
                     ))}
                   </ul>
                 </div>
@@ -239,17 +263,17 @@ function ApprovalsContent() {
             )}
 
             {isRiskError && (
-              <div className="alert alert-warning mb-4 text-sm">
-                spender 风险画像暂时不可用；授权额度仍来自链上实时读取。
+              <div className="alert alert-warning mb-4 text-sm" role="alert">
+                {t.approvals.riskUnavailable}
               </div>
             )}
 
             {scanResult?.status === 'complete' && approvals?.length === 0 && (
               <div className="card bg-base-200">
                 <div className="card-body items-center text-center">
-                  <p className="text-lg">✅ 很干净</p>
-                  <p className="text-sm text-base-content/60">
-                    该地址当前没有有效的代币授权。
+                  <p className="text-lg">{t.approvals.cleanTitle}</p>
+                  <p className="text-sm text-base-content/70">
+                    {t.approvals.cleanDescription}
                   </p>
                 </div>
               </div>
@@ -258,12 +282,12 @@ function ApprovalsContent() {
             {approvals && approvals.length > 0 && (
               <>
                 <div className="mb-2 flex items-center justify-between">
-                  <p className="text-sm text-base-content/60">
-                    共 {approvals.length} 条有效授权
+                  <p className="text-sm text-base-content/70">
+                    {t.approvals.approvalCount(approvals.length)}
                   </p>
                   {!canRevoke && (
-                    <p className="text-xs text-base-content/50">
-                      只读模式：连接该地址的钱包后才能撤销
+                    <p className="text-xs text-base-content/70">
+                      {t.approvals.readonlyMode}
                     </p>
                   )}
                 </div>
@@ -271,31 +295,25 @@ function ApprovalsContent() {
                 {hasPermit2 && (
                   <details className="collapse-arrow collapse mb-3 bg-base-200 text-sm">
                     <summary className="collapse-title font-medium">
-                      ℹ️ 什么是 Permit2 授权？为什么也要管
+                      {t.approvals.permit2Title}
                     </summary>
                     <div className="collapse-content text-base-content/70">
-                      你在 Uniswap 等应用点的 approve，很多时候是授权给{' '}
-                      <span className="font-mono">Permit2</span>{' '}
-                      合约，由它再把额度分发给具体的 spender（如 Universal
-                      Router），带额度和到期时间。所以「授权给 Permit2」只是表层——
-                      这里列出的{' '}
-                      <span className="badge badge-info badge-sm">Permit2</span>{' '}
-                      条目，才是 Permit2 内部替你授权的真实对象，它们才是真正能动你币的权限。
+                      {t.approvals.permit2Description}
                     </div>
                   </details>
                 )}
 
-                <div className="overflow-x-auto rounded-box border border-base-300">
-                  <table className="table">
-                    <thead>
+                <div className="rounded-box border border-base-300 md:overflow-x-auto">
+                  <table className="table block md:table" aria-label={t.approvals.title}>
+                    <thead className="hidden md:table-header-group">
                       <tr>
-                        <th>资产</th>
-                        <th>被授权方 / 风险</th>
-                        <th className="text-right">当前额度</th>
-                        <th className="text-right">操作</th>
+                        <th>{t.approvals.asset}</th>
+                        <th>{t.approvals.spenderRisk}</th>
+                        <th className="text-right">{t.approvals.allowance}</th>
+                        <th className="text-right">{t.approvals.action}</th>
                       </tr>
                     </thead>
-                    <tbody>
+                    <tbody className="block space-y-3 p-3 md:table-row-group md:space-y-0 md:p-0">
                       {approvals.map((a) => (
                         <ApprovalRow
                           key={a.id}
@@ -317,12 +335,28 @@ function ApprovalsContent() {
           </div>
         )}
 
-        <p className="mt-8 text-xs text-base-content/50">
-          🔒 只读查询不发起任何交易；撤销由你的钱包签名，本站绝不接触私钥。
+        <p className="mt-8 text-xs text-base-content/70">
+          {t.approvals.readonlyNotice}
         </p>
       </div>
     </main>
   );
+}
+
+function formatApprovalWarning(
+  warning: ApprovalWarning,
+  messages: ReturnType<typeof useI18n>['t']['approvals'],
+): string {
+  switch (warning.code) {
+    case 'index-truncated':
+      return messages.warningIndexTruncated(warning.maxRecordsPerSource);
+    case 'current-reads-failed':
+      return messages.warningCurrentReads(warning.count);
+    case 'decimals-failed':
+      return messages.warningDecimals(warning.count);
+    case 'balances-failed':
+      return messages.warningBalances(warning.count);
+  }
 }
 
 function safeNormalize(name: string): string | undefined {

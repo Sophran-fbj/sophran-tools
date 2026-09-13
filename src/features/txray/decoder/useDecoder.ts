@@ -10,7 +10,11 @@ import {
   type Hex,
   type PublicClient,
 } from 'viem';
-import { KNOWN_SIGNATURES, type Danger } from './signatures';
+import {
+  KNOWN_SIGNATURES,
+  type Danger,
+  type KnownExplainKey,
+} from './signatures';
 import { isRecord } from '@/lib/validation';
 
 export interface DecodedParam {
@@ -28,7 +32,7 @@ export interface DecodedResult {
   functionName: string | null;
   params: DecodedParam[];
   danger: Danger;
-  explain?: string;
+  explainKey?: KnownExplainKey;
   raw: Hex;
 }
 
@@ -119,7 +123,7 @@ export async function decodeInput(
     functionName,
     params,
     danger: known?.danger ?? 'none',
-    explain: known?.explain,
+    explainKey: known?.explainKey,
     raw: calldata,
   };
 }

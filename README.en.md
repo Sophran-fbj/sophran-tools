@@ -4,6 +4,8 @@
 
 > Onchain utilities for safer web3 interactions.
 
+**Live site:** [https://sophran-tools.vercel.app](https://sophran-tools.vercel.app)
+
 `sophran-tools` is a web3 tools site by Sophran. It currently includes **TxRay** and **Signature Risk**: TxRay checks approvals and decodes transactions, while Signature Risk analyzes EIP-712 signing risk.
 
 These tools focus on practical user safety: wallet connection, indexed chain data, RPC reads, multicall, calldata decoding, Permit2 allowance analysis, EIP-712 typed-data inspection, and plain-language risk explanation.
@@ -77,7 +79,7 @@ The site supports Chinese and English through a lightweight local i18n provider.
 | Chain interaction | wagmi 2 + viem 2 |
 | Query/cache | TanStack Query |
 | UI | Tailwind CSS 4 + DaisyUI 5 |
-| Tests | Vitest |
+| Tests | Vitest + Playwright |
 | Package manager | pnpm |
 
 ## Architecture
@@ -159,9 +161,10 @@ pnpm lint
 pnpm typecheck
 pnpm test
 pnpm build
+pnpm e2e
 ```
 
-GitHub Actions runs the same checks on pushes and pull requests.
+Run `pnpm exec playwright install chromium` before the first E2E run. GitHub Actions runs the same checks on pushes and pull requests.
 
 ## Next Steps
 
@@ -169,7 +172,6 @@ GitHub Actions runs the same checks on pushes and pull requests.
 - Add more chains after Ethereum / Base / Arbitrum / Optimism are stable.
 - Improve `$ at risk` caching and token price coverage.
 - Improve article authoring with MDX once content grows.
-- Deploy publicly and add the live URL here.
 
 ## License
 
