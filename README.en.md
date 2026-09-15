@@ -1,12 +1,22 @@
-﻿# Sophran Tools
+﻿# TxRay — Web3 Approval & Transaction Risk Explorer
 
 **Languages:** [中文](./README.md) | English
 
-> Onchain utilities for safer web3 interactions.
+[![Live Demo](https://img.shields.io/badge/Live_Demo-Open_TxRay-7c3aed?style=for-the-badge)](https://sophran-tools.vercel.app/tools/txray)
+[![Try without wallet](https://img.shields.io/badge/Try_without_wallet-Demo_Mode-0891b2?style=for-the-badge)](https://sophran-tools.vercel.app/tools/txray/approvals?demo=1)
+[![CI](https://github.com/Sophran-fbj/sophran-tools/actions/workflows/ci.yml/badge.svg)](https://github.com/Sophran-fbj/sophran-tools/actions/workflows/ci.yml)
 
-**Live site:** [https://sophran-tools.vercel.app](https://sophran-tools.vercel.app)
+> Inspect ERC-20, NFT, and Permit2 approvals, decode transactions and EIP-712 signatures, and understand every risk in plain language.
 
-`sophran-tools` is a web3 tools site by Sophran. It currently includes **TxRay** and **Signature Risk**: TxRay checks approvals and decodes transactions, while Signature Risk analyzes EIP-712 signing risk.
+> [!IMPORTANT]
+> **Safety boundary:** Read-only by default. Demo mode uses built-in samples—it never connects to a wallet, reads an address, or sends a transaction. Revokes require explicit confirmation in the user's wallet; the site never handles seed phrases or private keys.
+
+![TxRay desktop approval risk check](./docs/assets/txray-desktop.png)
+
+<p align="center"><strong>20-second walkthrough: inspect approvals and decode a transaction without connecting a wallet</strong></p>
+<p align="center"><img src="./docs/assets/txray-demo.gif" alt="TxRay wallet-free walkthrough" width="960" /></p>
+
+TxRay is the onchain-security product within Sophran Tools. It currently includes **Approval Check**, **Transaction Decoder**, and **Signature Risk** for token permissions, calldata / transaction input, and EIP-712 signing risk.
 
 These tools focus on practical user safety: wallet connection, indexed chain data, RPC reads, multicall, calldata decoding, Permit2 allowance analysis, EIP-712 typed-data inspection, and plain-language risk explanation.
 
@@ -175,7 +185,7 @@ Run `pnpm exec playwright install chromium` before the first E2E run. GitHub Act
 
 ## License
 
-MIT
+[MIT](./LICENSE)
 
 
 

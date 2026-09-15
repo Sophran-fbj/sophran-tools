@@ -14,8 +14,8 @@ export const messages = {
         '本站绝不索要你的助记词或私钥。所有写操作均通过你的钱包签名。',
     },
     home: {
-      title: 'Sophran Tools',
-      subtitle: 'Sophran 的 web3 工具站。不只显示风险，还用中文解释原理。',
+      title: 'TxRay',
+      subtitle: 'Web3 授权与交易风险检查器：不只标记风险，还解释为什么危险。',
       txrayDesc:
         '授权检查 + 交易解码：检测 ERC-20 / NFT / Permit2 授权，标记 spender 风险，并解释危险原因。',
       signatureRiskTitle: 'Signature Risk',
@@ -225,9 +225,9 @@ export const messages = {
         'This site never asks for your seed phrase or private key. All write actions are signed in your wallet.',
     },
     home: {
-      title: 'Sophran Tools',
+      title: 'TxRay',
       subtitle:
-        'Onchain utilities for safer web3 interactions.',
+        'A web3 approval and transaction risk explorer that explains why each risk matters.',
       txrayDesc:
         'Approval checks and transaction decoding for ERC-20, NFT, and Permit2 risk analysis.',
       signatureRiskTitle: 'Signature Risk',

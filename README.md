@@ -1,12 +1,22 @@
-﻿# Sophran Tools
+﻿# TxRay — Web3 授权与交易风险检查器
 
 **语言:** 中文 | [English](./README.en.md)
 
-> 一个不只检测链上风险，也解释风险原因的 web3 工具站。
+[![Live Demo](https://img.shields.io/badge/Live_Demo-Open_TxRay-7c3aed?style=for-the-badge)](https://sophran-tools.vercel.app/tools/txray)
+[![Try without wallet](https://img.shields.io/badge/Try_without_wallet-Demo_Mode-0891b2?style=for-the-badge)](https://sophran-tools.vercel.app/tools/txray/approvals?demo=1)
+[![CI](https://github.com/Sophran-fbj/sophran-tools/actions/workflows/ci.yml/badge.svg)](https://github.com/Sophran-fbj/sophran-tools/actions/workflows/ci.yml)
 
-**在线体验：** [https://sophran-tools.vercel.app](https://sophran-tools.vercel.app)
+> 检查 ERC-20、NFT 和 Permit2 授权，解码交易与 EIP-712 签名，并用人话解释风险。
 
-`sophran-tools` 是 Sophran 的 web3 工具站。当前包含 **TxRay** 和 **Signature Risk**：前者用于检查授权和解码交易，后者用于分析 EIP-712 签名风险。
+> [!IMPORTANT]
+> **安全边界：** 默认只读。演示模式只使用内置样例，不连接钱包、不读取地址，也不发送交易。撤销授权必须由用户在钱包中明确确认；本站绝不接触助记词或私钥。
+
+![TxRay 桌面端授权风险检查](./docs/assets/txray-desktop.png)
+
+<p align="center"><strong>20 秒操作演示：无需连接钱包即可体验授权检查与交易解码</strong></p>
+<p align="center"><img src="./docs/assets/txray-demo.gif" alt="TxRay 无钱包操作演示" width="960" /></p>
+
+TxRay 是 Sophran Tools 中面向链上安全的核心产品。当前包含 **授权检查**、**交易解码** 和 **Signature Risk**：分别用于分析代币授权、calldata / transaction input，以及 EIP-712 签名风险。
 
 这些工具关注真实的用户安全场景：钱包连接、索引化链上数据、RPC 读取、multicall、calldata 解码、Permit2 授权分析、EIP-712 typed data 检查，以及面向用户的人话解释。
 
@@ -175,7 +185,7 @@ pnpm e2e
 
 ## License
 
-MIT
+[MIT](./LICENSE)
 
 
 

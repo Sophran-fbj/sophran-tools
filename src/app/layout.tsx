@@ -3,8 +3,9 @@ import "./globals.css";
 import { Providers } from "./providers";
 
 export const metadata: Metadata = {
-  title: "Sophran Tools",
-  description: "Sophran 的 web3 工具站 —— 每个风险点都配人话解释",
+  title: "TxRay — Web3 Approval & Transaction Risk Explorer",
+  description:
+    "Inspect token approvals, decode transactions and EIP-712 signatures, and understand web3 risks in plain language.",
 };
 
 export default function RootLayout({
