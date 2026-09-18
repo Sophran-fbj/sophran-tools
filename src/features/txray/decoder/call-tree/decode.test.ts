@@ -460,6 +460,17 @@ describe('buildCallTree: 嵌套与递归限制', () => {
     expect(result.warnings.map((w) => w.code)).toContain('max-array-items-truncated');
   });
 
+  it('零地址参与解码：不崩溃、地址原样保留', () => {
+    const data = encodeAggregate3([
+      { target: ADDR.zero, allowFailure: false, callData: encodeApprove(ADDR.zero, 1n) },
+    ]);
+    const result = buildCallTree({ to: ADDR.zero, data });
+    expect(result.root.decodeStatus).toBe('decoded');
+    expect(result.root.target).toBe(ADDR.zero);
+    expect(result.root.children[0].target).toBe(ADDR.zero);
+    expect(result.root.children[0].params[0].value).toBe(ADDR.zero);
+  });
+
   it('rawPreview 有界：超大输入不会完整出现在展示字段', () => {
     const data = encodeNestedAggregate3(5);
     const result = buildCallTree({ to: ADDR.multicall3, data });
