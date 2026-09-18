@@ -139,6 +139,144 @@ export const messages = {
         transfer: '把代币转给 to，通常是普通转账。',
         safeTransferFrom: '转移指定 tokenId 的 NFT。',
       },
+      tree: {
+        title: '调用树（静态解码）',
+        staticNotice:
+          '这是静态解码结果，不是交易执行模拟；解析成功不代表执行成功，更不代表资产安全。',
+        nodeCount: (count: number) => `共 ${count} 个节点`,
+        expandAll: '全部展开',
+        collapseAll: '全部收起',
+        expand: '展开子调用',
+        collapse: '收起子调用',
+        rawPreview: '原始数据（有限长度）',
+        emptyCallData: '空 calldata（纯转账，无调用数据）',
+        target: '目标',
+        value: '携带',
+        selector: '选择器',
+        status: '解析状态',
+        unknownTarget: '（未知目标）',
+        statusLabels: {
+          decoded: '已准确解析',
+          'signature-only': '仅识别签名',
+          partial: '部分解析',
+          unknown: '未知调用',
+          'recursion-stopped': '递归已停止',
+          malformed: '输入格式错误',
+        },
+        stopReasons: {
+          'max-depth': '已达到最大递归深度（5 层），为安全起见停止展开剩余子调用',
+          'max-nodes': '已达到最大节点数（100），为安全起见停止展开剩余子调用',
+          'max-input-bytes': '输入数据超过大小限制（32KB），解析已按安全限制停止',
+        },
+        warnings: {
+          'empty-calldata': '空 calldata',
+          'max-depth-reached': '已达到最大递归深度，剩余子调用未展开',
+          'max-nodes-reached': '已达到最大节点数，剩余子调用未展开',
+          'max-input-bytes-exceeded': '输入超过大小限制，解析已停止',
+          'max-array-items-truncated': '数组项数超过上限，超出部分未解析',
+          'child-decode-failed': '该节点下有子调用解码失败，其余子调用已保留',
+          'param-value-truncated': '参数过长，展示已截断',
+          'container-identification-uncertain': '容器识别依据不充分',
+        },
+        containers: {
+          'multicall3-aggregate3': 'Multicall3 · aggregate3 批量调用',
+          'multicall3-aggregate3Value': 'Multicall3 · aggregate3Value 批量调用（带主链币）',
+          'multicall-bytes': 'multicall(bytes[]) 批量调用',
+          'safe-execTransaction': 'Safe · execTransaction',
+          'account-execute': '智能账户 · execute',
+          'account-executeBatch': '智能账户 · executeBatch 批量执行',
+          'entrypoint-handleOps': 'ERC-4337 EntryPoint · handleOps',
+          'entrypoint-handleOps-legacy': 'ERC-4337 EntryPoint · handleOps（v0.6 旧布局）',
+          'entrypoint-userOperation': 'UserOperation',
+        },
+        identification: {
+          'canonical-address-and-abi': '识别依据：官方部署地址 + 官方 ABI 形状均匹配',
+          'selector-and-abi-shape': '识别依据：函数选择器与官方 ABI 形状匹配',
+          'entrypoint-canonical-address-and-abi':
+            '识别依据：官方 EntryPoint 地址 + 官方 ABI 形状均匹配',
+          'abi-struct-shape': '识别依据：ABI 结构体布局匹配',
+        },
+        identificationNotes: {
+          'safe-selector-shared':
+            '同名选择器理论上也可能出现在非 Safe 合约上；这里按 ABI 形状识别，不据此断言合约身份。',
+          'multicall-bytes-shared':
+            '该选择器被多个合约使用（如 Uniswap 路由、MakerDAO Multicall）；子调用在容器合约自身上下文执行，具体语义取决于实现。',
+          'canonical-address-mismatch':
+            '目标地址不是官方 Multicall3 部署地址，请自行核实该合约身份。',
+          'entrypoint-address-unknown':
+            '目标不是已知官方 EntryPoint 地址，版本按 ABI 布局推断。',
+        },
+        userOp: {
+          factory: 'factory（部署账户）',
+          paymaster: 'paymaster（代付 gas）',
+          versionLabel: '版本',
+          signatureNote: '签名只显示长度与摘要，不做验证',
+        },
+        severityLabels: {
+          high: '高风险',
+          medium: '注意',
+          low: '低风险',
+          info: '提示',
+        },
+        riskTitles: {
+          'erc20-max-allowance': '发现无限额度授权（max）',
+          'erc20-increase-allowance': '增加 spender 额度',
+          'nft-approval-for-all': 'NFT 全集合授权',
+          'erc20-permit': 'ERC-20 permit 离线授权',
+          'permit2-permit': 'Permit2 花费授权',
+          'transfer-from': 'transferFrom 转出资产',
+          'safe-delegatecall': 'Safe 使用 DELEGATECALL',
+          'nonzero-native-value': '携带主链币',
+          'batch-contains-high-risk': '批量调用中混入高风险授权',
+          'unknown-target': '未知目标合约',
+          'unknown-selector': '包含未知调用',
+          'parse-incomplete': '解析不完整',
+          'userop-factory': 'UserOperation 包含 factory（将部署账户）',
+          'userop-paymaster': 'UserOperation 包含 paymaster',
+          'deadline-suspicious': '授权截止时间异常',
+          'subcall-allow-failure': '子调用允许失败',
+          'depth-limit-reached': '已达到最大递归深度',
+          'node-limit-reached': '已达到最大节点数',
+        },
+        riskExplains: {
+          'erc20-max-allowance':
+            '该调用把代币额度授权为 uint 最大值，等效于无限授权；spender 在授权有效期内可能转走全部余额。建议核实 spender 身份。',
+          'erc20-increase-allowance':
+            '该调用会增加 spender 的可花费额度，请确认额度变化符合预期。',
+          'nft-approval-for-all':
+            '该调用把整个 NFT 集合的处置权授予 operator；operator 之后可能转移集合内任意 NFT。',
+          'erc20-permit':
+            '该调用使用离线签名完成授权，不需要单独的 approve 交易；请确认签名者与 spender 都可信。',
+          'permit2-permit':
+            '该调用通过 Permit2 授予 spender 花费权限；Permit2 授权可能绕过表层 ERC-20 approve 展示。',
+          'transfer-from':
+            '该调用会把资产从 from 转到 to，通常在消耗已有授权；请确认 from 与 to 符合预期。',
+          'safe-delegatecall':
+            '这笔 Safe 交易使用 DELEGATECALL 执行内部数据：代码将在 Safe 合约的存储上下文中运行，可能直接动用 Safe 的全部资产。除非明确知道自己在做什么，应高度警惕。',
+          'nonzero-native-value':
+            '该调用携带主链币；静态解码无法判断资金最终去向，建议核实接收方。',
+          'batch-contains-high-risk':
+            '这批子调用中混有高风险授权；即使其他子调用看起来正常，也请逐项核实。',
+          'unknown-target':
+            '无法确定该调用的目标地址；请在可信区块浏览器上进一步核实。',
+          'unknown-selector':
+            '该调用的函数选择器未被签名库收录，无法解析其行为；签名库未收录不等于安全。',
+          'parse-incomplete':
+            '该节点的解析不完整（部分数据无法解码或被安全限制截断）；当前展示不等于全部内容。',
+          'userop-factory':
+            '该 UserOperation 会在执行过程中部署新的账户合约；新合约没有历史记录可供参考。',
+          'userop-paymaster':
+            '该 UserOperation 由 paymaster 代付 gas；实际执行者与付费者可能不同。',
+          'deadline-suspicious':
+            '该授权的截止时间已过期或长得异常；请结合具体场景核实。',
+          'subcall-allow-failure':
+            '该子调用允许失败（allowFailure）；失败会被静默吞掉，可能掩盖部分操作没有执行。',
+          'depth-limit-reached':
+            '嵌套深度已达上限，更深层的内容没有展开；请知悉存在未展示部分。',
+          'node-limit-reached':
+            '节点数量已达上限，剩余子调用没有展开；请知悉存在未展示部分。',
+        },
+      },
     },
     signatureRisk: {
       title: 'Signature Risk',
@@ -352,6 +490,144 @@ export const messages = {
         increaseAllowance: 'Increases the amount the spender may use.',
         transfer: 'Transfers tokens to the recipient and is usually a standard transfer.',
         safeTransferFrom: 'Transfers the specified NFT tokenId.',
+      },
+      tree: {
+        title: 'Call tree (static decoding)',
+        staticNotice:
+          'This is a static decoding result, not a transaction simulation. A successful decode does not mean the transaction will succeed or that assets are safe.',
+        nodeCount: (count: number) => `${count} node${count === 1 ? '' : 's'}`,
+        expandAll: 'Expand all',
+        collapseAll: 'Collapse all',
+        expand: 'Expand subcalls',
+        collapse: 'Collapse subcalls',
+        rawPreview: 'Raw data (bounded preview)',
+        emptyCallData: 'Empty calldata (plain transfer, no call data)',
+        target: 'Target',
+        value: 'Value',
+        selector: 'Selector',
+        status: 'Decode status',
+        unknownTarget: '(unknown target)',
+        statusLabels: {
+          decoded: 'Decoded',
+          'signature-only': 'Signature only',
+          partial: 'Partially decoded',
+          unknown: 'Unknown call',
+          'recursion-stopped': 'Recursion stopped',
+          malformed: 'Malformed input',
+        },
+        stopReasons: {
+          'max-depth': 'Maximum recursion depth (5) reached; remaining subcalls are not expanded for safety',
+          'max-nodes': 'Maximum node count (100) reached; remaining subcalls are not expanded for safety',
+          'max-input-bytes': 'Input exceeds the size limit (32KB); parsing stopped by the safety limit',
+        },
+        warnings: {
+          'empty-calldata': 'Empty calldata',
+          'max-depth-reached': 'Maximum recursion depth reached; remaining subcalls are not expanded',
+          'max-nodes-reached': 'Maximum node count reached; remaining subcalls are not expanded',
+          'max-input-bytes-exceeded': 'Input exceeds the size limit; parsing stopped',
+          'max-array-items-truncated': 'Array exceeds the item limit; extra items are not decoded',
+          'child-decode-failed': 'Some subcall under this node failed to decode; the rest are preserved',
+          'param-value-truncated': 'Parameter value was truncated for display',
+          'container-identification-uncertain': 'Container identification is uncertain',
+        },
+        containers: {
+          'multicall3-aggregate3': 'Multicall3 · aggregate3 batch',
+          'multicall3-aggregate3Value': 'Multicall3 · aggregate3Value batch (with native value)',
+          'multicall-bytes': 'multicall(bytes[]) batch',
+          'safe-execTransaction': 'Safe · execTransaction',
+          'account-execute': 'Smart account · execute',
+          'account-executeBatch': 'Smart account · executeBatch',
+          'entrypoint-handleOps': 'ERC-4337 EntryPoint · handleOps',
+          'entrypoint-handleOps-legacy': 'ERC-4337 EntryPoint · handleOps (v0.6 legacy layout)',
+          'entrypoint-userOperation': 'UserOperation',
+        },
+        identification: {
+          'canonical-address-and-abi': 'Identified by canonical deployment address + official ABI shape',
+          'selector-and-abi-shape': 'Identified by function selector + official ABI shape',
+          'entrypoint-canonical-address-and-abi':
+            'Identified by canonical EntryPoint address + official ABI shape',
+          'abi-struct-shape': 'Identified by ABI struct layout',
+        },
+        identificationNotes: {
+          'safe-selector-shared':
+            'The same selector could theoretically appear on a non-Safe contract. Identification is shape-based and does not assert contract identity.',
+          'multicall-bytes-shared':
+            'Multiple contracts use this selector (Uniswap routers, MakerDAO Multicall, ...). Subcalls execute in the container contract\'s own context; exact semantics depend on the implementation.',
+          'canonical-address-mismatch':
+            'The target is not the official Multicall3 deployment address. Verify the contract independently.',
+          'entrypoint-address-unknown':
+            'The target is not a known official EntryPoint address; the version is inferred from the ABI layout.',
+        },
+        userOp: {
+          factory: 'factory (deploys the account)',
+          paymaster: 'paymaster (sponsors gas)',
+          versionLabel: 'Version',
+          signatureNote: 'Signature shows length and digest only; it is not verified',
+        },
+        severityLabels: {
+          high: 'High risk',
+          medium: 'Caution',
+          low: 'Low risk',
+          info: 'Info',
+        },
+        riskTitles: {
+          'erc20-max-allowance': 'Unlimited (max) token allowance found',
+          'erc20-increase-allowance': 'Spender allowance increase',
+          'nft-approval-for-all': 'Whole-collection NFT approval',
+          'erc20-permit': 'ERC-20 permit approval',
+          'permit2-permit': 'Permit2 spending approval',
+          'transfer-from': 'transferFrom moves assets',
+          'safe-delegatecall': 'Safe uses DELEGATECALL',
+          'nonzero-native-value': 'Native value attached',
+          'batch-contains-high-risk': 'Batch mixes in high-risk approvals',
+          'unknown-target': 'Unknown target contract',
+          'unknown-selector': 'Contains an unknown call',
+          'parse-incomplete': 'Parsing incomplete',
+          'userop-factory': 'UserOperation contains a factory',
+          'userop-paymaster': 'UserOperation contains a paymaster',
+          'deadline-suspicious': 'Unusual approval deadline',
+          'subcall-allow-failure': 'Subcall may fail silently',
+          'depth-limit-reached': 'Maximum recursion depth reached',
+          'node-limit-reached': 'Maximum node count reached',
+        },
+        riskExplains: {
+          'erc20-max-allowance':
+            'This call approves the uint maximum amount, which is effectively an unlimited allowance. The spender may be able to move the full balance while the approval is valid. Verify the spender.',
+          'erc20-increase-allowance':
+            'This call increases the amount the spender may use. Confirm the change matches your expectation.',
+          'nft-approval-for-all':
+            'This call grants an operator control over the whole NFT collection; the operator may transfer any NFT in it later.',
+          'erc20-permit':
+            'This call completes an approval through an offchain signature without a separate approve transaction. Verify both the signer and the spender.',
+          'permit2-permit':
+            'This call grants spending permission through Permit2. Permit2 approvals may not show up as a plain ERC-20 approve.',
+          'transfer-from':
+            'This call moves assets from from to to, usually consuming an existing approval. Confirm both addresses.',
+          'safe-delegatecall':
+            'This Safe transaction uses DELEGATECALL: the inner code runs in the Safe contract\'s storage context and may access all Safe assets. Treat it with great caution unless you know exactly what it does.',
+          'nonzero-native-value':
+            'This call carries native currency. Static decoding cannot tell where the funds end up; verify the recipient.',
+          'batch-contains-high-risk':
+            'High-risk approvals are mixed into this batch. Even if other subcalls look normal, review every item.',
+          'unknown-target':
+            'The target address of this call cannot be determined. Verify it on a trusted block explorer.',
+          'unknown-selector':
+            'The function selector is not in the signature database, so the behavior cannot be parsed. Unknown does not mean safe.',
+          'parse-incomplete':
+            'Parsing is incomplete for this node (some data could not be decoded or was cut by safety limits). What you see is not the whole picture.',
+          'userop-factory':
+            'This UserOperation deploys a new account contract during execution. New contracts have no history to evaluate.',
+          'userop-paymaster':
+            'A paymaster sponsors the gas for this UserOperation; the executor and the payer may differ.',
+          'deadline-suspicious':
+            'The approval deadline has already passed or is unusually long. Verify it for your scenario.',
+          'subcall-allow-failure':
+            'This subcall allows failure; failures are swallowed silently and may hide operations that never executed.',
+          'depth-limit-reached':
+            'The nesting depth cap was reached, so deeper content is not expanded. Be aware that part of the tree is not shown.',
+          'node-limit-reached':
+            'The node count cap was reached, so remaining subcalls are not expanded. Be aware that part of the tree is not shown.',
+        },
       },
     },
     signatureRisk: {

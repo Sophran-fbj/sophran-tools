@@ -34,6 +34,8 @@ export interface DecodedResult {
   danger: Danger;
   explainKey?: KnownExplainKey;
   raw: Hex;
+  /** 交易 hash 来源时携带的主链币数量（calldata 输入时为 undefined）。 */
+  txValue?: bigint | null;
 }
 
 type SignatureLookup = (selector: string) => Promise<string | null>;
@@ -71,6 +73,7 @@ export async function decodeInput(
   let calldata: string;
   let to: Address | undefined;
   let source: 'calldata' | 'tx';
+  let txValue: bigint | null | undefined;
 
   if (isTxHash(value)) {
     if (!client) throw new Error('读取交易 hash 需要目标链 RPC');
@@ -78,6 +81,7 @@ export async function decodeInput(
     const transaction = await client.getTransaction({ hash: value });
     calldata = transaction.input;
     to = transaction.to ?? undefined;
+    txValue = transaction.value ?? null;
     if (!calldata || calldata === '0x') {
       throw new Error('这是一笔普通转账（没有 calldata 可解码）');
     }
@@ -125,6 +129,7 @@ export async function decodeInput(
     danger: known?.danger ?? 'none',
     explainKey: known?.explainKey,
     raw: calldata,
+    txValue,
   };
 }
 

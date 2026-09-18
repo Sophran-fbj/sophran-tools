@@ -41,7 +41,8 @@ test('decoder localizes and decodes known calldata without a wallet', async ({ p
   await page.getByRole('button', { name: 'Use sample' }).click();
 
   await expect(page.getByRole('heading', { name: 'Transaction decoder' })).toBeVisible();
-  await expect(page.getByText('approve', { exact: true })).toBeVisible();
+  // 函数名同时出现在参数卡与调用树节点中，取第一个即可
+  await expect(page.getByText('approve', { exact: true }).first()).toBeVisible();
   await expect(page.getByText('⚠️ High risk', { exact: true })).toBeVisible();
   await expect(page.getByText('Unlimited (max uint256)')).toBeVisible();
   await expect(page.getByText(/Allows the spender to use your tokens/)).toBeVisible();
