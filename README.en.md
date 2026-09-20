@@ -5,6 +5,7 @@
 [![Live Demo](https://img.shields.io/badge/Live_Demo-Open_TxRay-7c3aed?style=for-the-badge)](https://sophran-tools.vercel.app/tools/txray)
 [![Try without wallet](https://img.shields.io/badge/Try_without_wallet-Demo_Mode-0891b2?style=for-the-badge)](https://sophran-tools.vercel.app/tools/txray/approvals?demo=1)
 [![CI](https://github.com/Sophran-fbj/sophran-tools/actions/workflows/ci.yml/badge.svg)](https://github.com/Sophran-fbj/sophran-tools/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/github/license/Sophran-fbj/sophran-tools)](./LICENSE)
 
 > Inspect ERC-20, NFT, and Permit2 approvals, decode transactions and EIP-712 signatures, and understand every risk in plain language.
 
