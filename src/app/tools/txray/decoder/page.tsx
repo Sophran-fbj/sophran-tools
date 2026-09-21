@@ -11,6 +11,7 @@ import {
   type DecodedParam,
   type DecodedResult,
 } from '@/features/txray/decoder/useDecoder';
+import CallTreeView, { useCallTree } from '@/features/txray/decoder/CallTreeView';
 import { getSpenderLabel } from '@/features/txray/approvals/spenderLabels';
 import {
   DEFAULT_TXRAY_CHAIN_ID,
@@ -127,6 +128,13 @@ export default function DecoderPage() {
 
 function DecodedView({ data, chainId }: { data: DecodedResult; chainId: number }) {
   const { t } = useI18n();
+  const tree = useCallTree({
+    to: data.to,
+    value: data.txValue ?? null,
+    data: data.raw,
+    selector: data.selector,
+    signature: data.signature,
+  });
   const dangerStyle =
     data.danger === 'high'
       ? 'alert-error'
@@ -181,6 +189,17 @@ function DecodedView({ data, chainId }: { data: DecodedResult; chainId: number }
             </div>
           )}
 
+          {data.txValue !== undefined && data.txValue !== null && data.txValue !== 0n && (
+            <div>
+              <div className="text-xs text-base-content/70">
+                {t.decoder.tree.value}
+              </div>
+              <div className="break-all font-mono text-xs">
+                {data.txValue.toString()} wei
+              </div>
+            </div>
+          )}
+
           {data.params.length > 0 && (
             <table className="table table-sm block sm:table">
               <thead className="hidden sm:table-header-group">
@@ -204,6 +223,14 @@ function DecodedView({ data, chainId }: { data: DecodedResult; chainId: number }
           )}
         </div>
       </div>
+
+      {/* 树身份 = 链 + 目标 + calldata：切换缓存结果时强制重建组件，
+          让默认展开状态（高风险 / 未知路径）对新树重新计算 */}
+      <CallTreeView
+        key={`${chainId}:${data.to ?? ''}:${data.raw}`}
+        tree={tree}
+        chainId={chainId}
+      />
 
       <details className="collapse-arrow collapse bg-base-200">
         <summary className="collapse-title text-sm text-base-content/70">
