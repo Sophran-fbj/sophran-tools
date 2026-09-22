@@ -5,7 +5,7 @@ import { isRecord } from '@/lib/validation';
 // 服务端反查函数选择器 → 签名（openchain 签名数据库）。
 // 放服务端：① 在国内 dev 下走 DEV_PROXY；② 避免浏览器跨域。
 export async function GET(req: NextRequest) {
-  const rateLimit = checkRateLimit(
+  const rateLimit = await checkRateLimit(
     `decode-sig:${requestClientKey(req.headers)}`,
     30,
     60_000,
@@ -15,7 +15,10 @@ export async function GET(req: NextRequest) {
       { signature: null, error: '请求过于频繁，请稍后重试' },
       {
         status: 429,
-        headers: { 'Retry-After': String(rateLimit.retryAfterSeconds) },
+        headers: {
+          'Retry-After': String(rateLimit.retryAfterSeconds),
+          'X-TxRay-Guard': rateLimit.backend,
+        },
       },
     );
   }
@@ -38,7 +41,12 @@ export async function GET(req: NextRequest) {
       list && typeof list[0]?.name === 'string' ? list[0].name : null;
     return NextResponse.json(
       { signature },
-      { headers: { 'Cache-Control': 'public, max-age=86400, s-maxage=604800' } },
+      {
+        headers: {
+          'Cache-Control': 'public, max-age=86400, s-maxage=604800',
+          'X-TxRay-Guard': rateLimit.backend,
+        },
+      },
     );
   } catch (e) {
     // 反查失败不致命：解码器仍可只显示选择器
