@@ -12,6 +12,8 @@ import {
   scheduleExternalRequest,
 } from '@/lib/server/requestGuard';
 import { isRecord } from '@/lib/validation';
+import { parseApprovalIndexPayload } from '@/features/txray/approvals/approvalIndex';
+import { getSharedJson, setSharedJson } from '@/lib/server/sharedState';
 
 const APPROVAL_TOPIC0 =
   '0x8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925';
@@ -26,6 +28,8 @@ const MAX_PAGES_PER_SOURCE = 10;
 const UPSTREAM_TIMEOUT_MS = 12_000;
 const CACHE_TTL_MS = 60_000;
 const MAX_CACHE_ENTRIES = 2_000;
+const SHARED_CACHE_NAMESPACE = 'approval-scan';
+const SHARED_CACHE_TTL_SECONDS = 60;
 
 interface EtherscanLog {
   address: string;
@@ -231,7 +235,7 @@ async function scanApprovals(
 }
 
 export async function GET(request: NextRequest) {
-  const rateLimit = checkRateLimit(
+  const rateLimit = await checkRateLimit(
     `approvals:${requestClientKey(request.headers)}`,
     8,
     60_000,
@@ -241,7 +245,10 @@ export async function GET(request: NextRequest) {
       { error: { code: 'RATE_LIMITED', message: '请求过于频繁，请稍后重试' } },
       {
         status: 429,
-        headers: { 'Retry-After': String(rateLimit.retryAfterSeconds) },
+        headers: {
+          'Retry-After': String(rateLimit.retryAfterSeconds),
+          'X-TxRay-Guard': rateLimit.backend,
+        },
       },
     );
   }
@@ -274,7 +281,34 @@ export async function GET(request: NextRequest) {
   const cached = responseCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) {
     return NextResponse.json(cached.value, {
-      headers: { 'Cache-Control': 'public, max-age=30, s-maxage=60' },
+      headers: {
+        'Cache-Control': 'public, max-age=30, s-maxage=60',
+        'X-TxRay-Cache': 'memory',
+        'X-TxRay-Guard': rateLimit.backend,
+      },
+    });
+  }
+
+  let sharedCacheStatus = 'memory-only';
+  try {
+    const shared = await getSharedJson(SHARED_CACHE_NAMESPACE, cacheKey);
+    if (shared.status === 'hit') {
+      const value = parseApprovalIndexPayload(shared.value);
+      cacheResponse(cacheKey, value);
+      return NextResponse.json(value, {
+        headers: {
+          'Cache-Control': 'public, max-age=30, s-maxage=60',
+          'X-TxRay-Cache': 'shared',
+          'X-TxRay-Guard': rateLimit.backend,
+        },
+      });
+    }
+    if (shared.status === 'miss') sharedCacheStatus = 'shared-miss';
+  } catch (error) {
+    sharedCacheStatus = 'degraded';
+    console.warn('[approvals] shared cache read failed', {
+      chainId,
+      message: error instanceof Error ? error.message : 'unknown error',
     });
   }
 
@@ -286,8 +320,25 @@ export async function GET(request: NextRequest) {
     }
     const value = await pending;
     cacheResponse(cacheKey, value);
+    try {
+      await setSharedJson(
+        SHARED_CACHE_NAMESPACE,
+        cacheKey,
+        value,
+        SHARED_CACHE_TTL_SECONDS,
+      );
+    } catch (error) {
+      console.warn('[approvals] shared cache write failed', {
+        chainId,
+        message: error instanceof Error ? error.message : 'unknown error',
+      });
+    }
     return NextResponse.json(value, {
-      headers: { 'Cache-Control': 'public, max-age=30, s-maxage=60' },
+      headers: {
+        'Cache-Control': 'public, max-age=30, s-maxage=60',
+        'X-TxRay-Cache': sharedCacheStatus,
+        'X-TxRay-Guard': rateLimit.backend,
+      },
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : '上游查询失败';

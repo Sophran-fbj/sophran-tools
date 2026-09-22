@@ -29,7 +29,7 @@ function isContractCreation(value: unknown): value is ContractCreation {
 }
 
 export async function GET(request: NextRequest) {
-  const rateLimit = checkRateLimit(
+  const rateLimit = await checkRateLimit(
     `spender-info:${requestClientKey(request.headers)}`,
     20,
     60_000,
@@ -39,7 +39,10 @@ export async function GET(request: NextRequest) {
       { error: { code: 'RATE_LIMITED', message: '请求过于频繁，请稍后重试' } },
       {
         status: 429,
-        headers: { 'Retry-After': String(rateLimit.retryAfterSeconds) },
+        headers: {
+          'Retry-After': String(rateLimit.retryAfterSeconds),
+          'X-TxRay-Guard': rateLimit.backend,
+        },
       },
     );
   }
@@ -124,6 +127,11 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json(
     { created, complete },
-    { headers: { 'Cache-Control': 'public, max-age=300, s-maxage=3600' } },
+    {
+      headers: {
+        'Cache-Control': 'public, max-age=300, s-maxage=3600',
+        'X-TxRay-Guard': rateLimit.backend,
+      },
+    },
   );
 }

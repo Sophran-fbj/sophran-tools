@@ -150,6 +150,8 @@ pnpm dev
 | `NEXT_PUBLIC_ALCHEMY_ID` | Alchemy RPC key |
 | `ETHERSCAN_API_KEY` | Etherscan V2 API key，服务端路由使用 |
 | `DEV_PROXY` | 可选，本地开发时让服务端 fetch 走 HTTP/混合代理 |
+| `UPSTASH_REDIS_REST_URL` | 可选；生产环境跨实例共享限流、Etherscan 节流和短期授权缓存 |
+| `UPSTASH_REDIS_REST_TOKEN` | 可选；对应 Redis REST 写入 token，只能放在服务端 |
 
 `DEV_PROXY` 示例：
 
@@ -158,6 +160,8 @@ DEV_PROXY=http://127.0.0.1:10808
 ```
 
 本地未配置 `NEXT_PUBLIC_WC_PROJECT_ID` 时仍可构建，并只启用浏览器注入钱包；生产环境应配置真实且限制域名的 Project ID。
+
+未配置 Redis 时服务会自动回退到进程内限流、请求队列和缓存，适合本地开发；Serverless 生产环境建议配置共享后端。API 响应通过 `X-TxRay-Guard` 和 `X-TxRay-Cache` 暴露当前使用的保护与缓存层，包括共享缓存未命中和降级状态。共享缓存 TTL 为 60 秒，钱包地址和客户端 IP 只用于生成服务端 HMAC 键，不以明文写入 Redis。
 
 ## 已知限制
 

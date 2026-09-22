@@ -150,6 +150,8 @@ Required environment variables:
 | `NEXT_PUBLIC_ALCHEMY_ID` | Alchemy RPC key |
 | `ETHERSCAN_API_KEY` | Etherscan V2 API key used by server routes |
 | `DEV_PROXY` | Optional local HTTP/mixed proxy for mainland-China development |
+| `UPSTASH_REDIS_REST_URL` | Optional; shares rate limits, Etherscan pacing, and short-lived approval cache across production instances |
+| `UPSTASH_REDIS_REST_TOKEN` | Optional; matching Redis REST write token, server-side only |
 
 Example `DEV_PROXY`:
 
@@ -158,6 +160,8 @@ DEV_PROXY=http://127.0.0.1:10808
 ```
 
 Without `NEXT_PUBLIC_WC_PROJECT_ID`, local builds still work with injected browser wallets only. Production should provide a real, domain-restricted Project ID.
+
+Without Redis, the service falls back to process-local rate limits, request pacing, and caching, which is suitable for local development. A shared backend is recommended for serverless production. API responses expose the active layers, shared-cache misses, and degraded states through `X-TxRay-Guard` and `X-TxRay-Cache`. Shared approval entries expire after 60 seconds; wallet addresses and client IPs are used only to derive server-side HMAC keys and are never stored in plaintext in Redis.
 
 ## Known Limitations
 
