@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import Link from 'next/link';
 import { getAddress, isAddress } from 'viem';
 import { buildCallTree } from './call-tree/decode';
 import {
@@ -141,7 +142,13 @@ export default function CallTreeView({
           className="rounded-box bg-base-300/60 px-3 py-2 text-xs text-base-content/80"
           data-testid="static-decode-notice"
         >
-          ℹ️ {t.decoder.tree.staticNotice}
+          ℹ️ {t.decoder.tree.staticNotice}{' '}
+          <Link
+            href="/articles/why-batched-transactions-hide-risk"
+            className="link link-primary"
+          >
+            {t.decoder.tree.learnMore}
+          </Link>
         </p>
 
         <ul role="tree" className="space-y-1" onKeyDown={onKeyDown}>

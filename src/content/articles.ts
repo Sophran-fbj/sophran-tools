@@ -175,6 +175,83 @@ export const articles: Article[] = [
       },
     ],
   },
+  {
+    slug: 'why-batched-transactions-hide-risk',
+    title: {
+      zh: '批量交易为什么容易隐藏风险',
+      en: 'Why Batched Transactions Can Hide Risk',
+    },
+    description: {
+      zh: 'multicall、Safe 和智能账户会把多层调用装进一笔交易，只看最外层函数很容易漏掉真正的授权与转账。',
+      en: 'Multicall, Safe, and smart accounts can pack several call layers into one transaction, hiding approvals and transfers behind the outer function.',
+    },
+    date: '2026-09-22',
+    tags: ['Multicall', 'Safe', 'ERC-4337', 'Risk'],
+    relatedTools: [
+      {
+        label: { zh: '用 TxRay 展开调用树', en: 'Expand a call tree with TxRay' },
+        href: '/tools/txray/decoder',
+      },
+      {
+        label: { zh: '检查现有授权', en: 'Check existing approvals' },
+        href: '/tools/txray/approvals?demo=1',
+      },
+    ],
+    sections: [
+      {
+        heading: { zh: '外层函数不等于完整意图', en: 'The Outer Function Is Not the Full Intent' },
+        body: [
+          {
+            zh: '一笔交易的最外层可能只是 aggregate3、multicall、execute 或 handleOps。真正会修改授权、转走资产或调用未知合约的 calldata，常常藏在 bytes、tuple 或 UserOperation 的内部字段里。',
+            en: 'The outer function may only be aggregate3, multicall, execute, or handleOps. Calldata that changes approvals, transfers assets, or calls unknown contracts is often nested inside bytes, tuples, or a UserOperation.',
+          },
+          {
+            zh: '如果界面只显示最外层函数名称，用户会看到“批量执行”，却看不到里面同时包含的无限 approve。风险判断必须沿着调用路径逐层展开。',
+            en: 'A UI that shows only the outer function can say “batch execution” while hiding an unlimited approve inside. Risk analysis has to follow each nested call path.',
+          },
+        ],
+      },
+      {
+        heading: { zh: '三类常见容器', en: 'Three Common Call Containers' },
+        body: [
+          {
+            zh: 'Multicall 把多个调用合并进一笔交易；Safe execTransaction 可以执行普通 CALL，也可以执行影响更大的 DELEGATECALL；ERC-4337 EntryPoint 的 handleOps 则会继续进入智能账户的 callData。它们本身不一定恶意，但都扩大了需要检查的范围。',
+            en: 'Multicall combines several calls, Safe execTransaction can perform CALL or higher-impact DELEGATECALL, and ERC-4337 EntryPoint handleOps continues into smart-account callData. None is inherently malicious, but each expands what must be inspected.',
+          },
+          {
+            zh: '尤其是 DELEGATECALL：目标代码会在当前账户的存储与权限上下文中运行。目标地址、实现来源和内部 calldata 都需要同时核实。',
+            en: 'DELEGATECALL deserves special care because target code runs in the current account’s storage and authority context. Verify the target, implementation provenance, and nested calldata together.',
+          },
+        ],
+      },
+      {
+        heading: { zh: 'TxRay 如何展开调用树', en: 'How TxRay Builds the Call Tree' },
+        body: [
+          {
+            zh: 'TxRay 识别常见容器的 ABI 形状，递归解码子调用，并把高风险、未知、截断或解析不完整的路径默认展开。深度、节点数和原始数据预览都有明确上限，避免恶意 calldata 造成浏览器资源耗尽。',
+            en: 'TxRay recognizes common container ABI shapes, recursively decodes child calls, and expands risky, unknown, truncated, or incomplete paths by default. Depth, node count, and raw previews are bounded to resist hostile calldata.',
+          },
+          {
+            zh: '风险会沿具体路径展示，例如 root → aggregate3[0] → approve。这样用户能看到危险操作藏在哪一层，而不只得到一个缺少上下文的红色标签。',
+            en: 'Findings are attached to concrete paths such as root → aggregate3[0] → approve, showing exactly where an operation is hidden instead of presenting a context-free warning.',
+          },
+        ],
+      },
+      {
+        heading: { zh: '静态解码的边界', en: 'Limits of Static Decoding' },
+        body: [
+          {
+            zh: '调用树解释的是 calldata 结构，不会执行交易，也不能预测代理升级、运行时分支、链上状态变化或目标合约最终会做什么。解析成功不代表交易会成功，更不代表安全。',
+            en: 'A call tree explains calldata structure. It does not execute the transaction or predict proxy upgrades, runtime branches, state changes, or the final behavior of target contracts. Successful decoding does not prove safety.',
+          },
+          {
+            zh: '遇到未知选择器、非标准账户、达到递归上限或目标地址无法确认时，应把结果当作“不完整”，核对钱包模拟、区块浏览器和可信合约来源后再签名。',
+            en: 'Treat unknown selectors, non-standard accounts, recursion limits, or unverified targets as incomplete. Cross-check wallet simulation, explorers, and trusted contract sources before signing.',
+          },
+        ],
+      },
+    ],
+  },
 ];
 
 export function getArticle(slug: string): Article | undefined {
