@@ -41,7 +41,7 @@ TxRay 的核心是 **检测 + 解释**：
 - 检测 NFT `setApprovalForAll` 整集合授权。
 - 检查 Uniswap Permit2 内部授权，而不只看表层的 ERC-20 approve。
 - 支持 Ethereum、Base、Arbitrum、Optimism。
-- 估算 `$ at risk`：用 `min(当前余额, 授权额度)` 计算实际暴露数量，并尽量通过 CoinGecko 换算美元。
+- 估算 `$ at risk`：用 `min(当前余额, 授权额度)` 计算实际暴露数量，通过服务端批量查询并缓存 CoinGecko 美元价格；页面明确展示完整、部分或不可用的价格覆盖状态。
 - 识别 spender 风险：
   - 已知可信合约；
   - EOA spender；
@@ -123,7 +123,7 @@ src/
 | spender 创建信息 | 服务端路由 -> Etherscan | API key 留在服务端。 |
 | calldata 解码 | 浏览器 + 签名查询路由 | 本地选择器表优先，未知再查 OpenChain。 |
 | EIP-712 分析 | 浏览器本地 | 纯 JSON 检查，不需要 RPC，也不需要签名。 |
-| Token 价格 | 浏览器 -> CoinGecko | 仅用于 `$ at risk` 估算，失败时回退到 token 数量。 |
+| Token 价格 | 浏览器 -> 服务端批量缓存 -> CoinGecko | 仅用于 `$ at risk` 估算；失败或缺价时明确显示覆盖范围，并回退到 token 数量。 |
 
 ## 安全姿态
 
@@ -131,7 +131,7 @@ src/
 - 默认都是只读分析。
 - 写操作只限于用户通过钱包主动发起的撤销交易。
 - Etherscan API key 保留在服务端。
-- 不持久化钱包地址或建立用户画像；授权和合约信息路由会瞬时处理查询地址，并将查询条件发送给 Etherscan。RPC 与 CoinGecko 请求也受各自第三方隐私政策约束。
+- 不持久化钱包地址或建立用户画像；授权和合约信息路由会瞬时处理查询地址，并将查询条件发送给 Etherscan。RPC 请求受节点服务商隐私政策约束；价格路由只把 token 合约地址发送给 CoinGecko，不发送钱包地址。
 - WalletConnect 和 Alchemy public key 属于前端 key，应在供应商后台配置域名限制。
 
 ## 本地开发
@@ -149,6 +149,7 @@ pnpm dev
 | `NEXT_PUBLIC_WC_PROJECT_ID` | Reown / WalletConnect Project ID，用于 RainbowKit |
 | `NEXT_PUBLIC_ALCHEMY_ID` | Alchemy RPC key |
 | `ETHERSCAN_API_KEY` | Etherscan V2 API key，服务端路由使用 |
+| `COINGECKO_DEMO_API_KEY` | 可选但建议配置；CoinGecko Demo API key，只在服务端使用；未配置时无 Key 模式每次只补充 1 个未缓存 token，并明确显示部分覆盖 |
 | `DEV_PROXY` | 可选，本地开发时让服务端 fetch 走 HTTP/混合代理 |
 
 `DEV_PROXY` 示例：
@@ -163,6 +164,7 @@ DEV_PROXY=http://127.0.0.1:10808
 
 - Etherscan 日志查询每类事件最多扫描 10,000 条；达到上限时页面显示“不完整扫描”，不会显示“很干净”。
 - spender 可信标签目前只对 Ethereum 主网地址生效；其他链默认按未知合约处理。
+- 单次授权扫描最多查询 500 个唯一 token 的美元价格，每个服务端批次最多 100 个；超过预算、CoinGecko 无报价或无 Key 模式受上游限制时，页面会显示部分覆盖，未报价不会被当作零风险。
 - Signature Risk 会按 EIP-712 `types` 展开结构和数组；缺少 schema 时仅做保守字段扫描，并在页面明确提示。
 
 ## 验证
@@ -181,7 +183,7 @@ pnpm e2e
 
 - 补充更多真实 spender 标签和公开 drainer/blocklist 数据源。
 - 在 Ethereum / Base / Arbitrum / Optimism 稳定后继续扩展更多链。
-- 改进 `$ at risk` 的缓存和价格覆盖。
+- 在 CoinGecko 之外增加第二价格源，并对低流动性报价增加质量提示。
 - 内容增长后，将文章系统升级为 MDX。
 
 ## License
