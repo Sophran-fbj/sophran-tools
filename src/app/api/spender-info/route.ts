@@ -7,6 +7,10 @@ import {
   scheduleExternalRequest,
 } from '@/lib/server/requestGuard';
 import { isRecord } from '@/lib/validation';
+import {
+  getThreatFeedSnapshot,
+  SCAM_SNIFFER_SOURCE,
+} from '@/lib/server/threatIntelligence';
 
 const ETHERSCAN_BASE = 'https://api.etherscan.io/v2/api';
 const MAX_ADDRESSES = 25;
@@ -76,13 +80,12 @@ export async function GET(request: NextRequest) {
   }
   if (!addresses.length) return NextResponse.json({ created: {}, complete: true });
 
-  const apiKey = process.env.ETHERSCAN_API_KEY;
-  if (!apiKey) return NextResponse.json({ created: {}, complete: false });
-
   const created: Record<string, number | null> = {};
-  let complete = true;
+  let creationComplete = true;
+  const apiKey = process.env.ETHERSCAN_API_KEY;
+  const threatSnapshotPromise = getThreatFeedSnapshot();
 
-  for (let index = 0; index < addresses.length; index += 5) {
+  for (let index = 0; apiKey && index < addresses.length; index += 5) {
     const chunk = addresses.slice(index, index + 5);
     const url = new URL(ETHERSCAN_BASE);
     url.searchParams.set('chainid', String(chainId));
@@ -113,7 +116,7 @@ export async function GET(request: NextRequest) {
             : null;
       }
     } catch (error) {
-      complete = false;
+      creationComplete = false;
       console.error('[spender-info] upstream request failed', {
         chainId,
         count: chunk.length,
@@ -122,8 +125,56 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  if (!apiKey) creationComplete = false;
+
+  let threat:
+    | {
+        status: 'available';
+        malicious: string[];
+        checkedAt: number;
+        stale: boolean;
+        source: typeof SCAM_SNIFFER_SOURCE;
+      }
+    | {
+        status: 'unavailable';
+        malicious: string[];
+        checkedAt: null;
+        stale: false;
+        source: typeof SCAM_SNIFFER_SOURCE;
+  };
+
+  try {
+    const snapshot = await threatSnapshotPromise;
+    threat = {
+      status: 'available',
+      malicious: addresses.filter((address) =>
+        snapshot.addresses.has(address.toLowerCase()),
+      ),
+      checkedAt: snapshot.fetchedAt,
+      stale: snapshot.stale,
+      source: SCAM_SNIFFER_SOURCE,
+    };
+  } catch (error) {
+    console.error('[spender-info] threat feed request failed', {
+      chainId,
+      message: error instanceof Error ? error.message : 'unknown error',
+    });
+    threat = {
+      status: 'unavailable',
+      malicious: [],
+      checkedAt: null,
+      stale: false,
+      source: SCAM_SNIFFER_SOURCE,
+    };
+  }
+
   return NextResponse.json(
-    { created, complete },
+    {
+      created,
+      complete: creationComplete,
+      creationComplete,
+      threat,
+    },
     { headers: { 'Cache-Control': 'public, max-age=300, s-maxage=3600' } },
   );
 }

@@ -2,7 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { usePublicClient } from 'wagmi';
-import { getAddress, type Address, type PublicClient } from 'viem';
+import { getAddress, isAddress, type Address, type PublicClient } from 'viem';
 import { getSpenderLabel } from './spenderLabels';
 import { isRecord } from '@/lib/validation';
 
@@ -15,10 +15,30 @@ export interface SpenderRisk {
   codeVerified: boolean;
   createdAt?: number;
   reason: string;
+  threat: ThreatIntelligenceStatus;
 }
 
-// Intentionally empty until a maintained, attributable threat feed is integrated.
-const BLOCKLIST = new Set<string>();
+export interface ThreatIntelligenceStatus {
+  status: 'available' | 'unavailable';
+  sourceName: string;
+  sourceUrl: string;
+  publicDelayDays: number;
+  checkedAt?: number;
+  stale?: boolean;
+}
+
+interface SpenderInfoPayload {
+  created: Record<string, number | null>;
+  malicious: Set<string>;
+  threat: ThreatIntelligenceStatus;
+}
+
+const DEFAULT_THREAT_STATUS: ThreatIntelligenceStatus = {
+  status: 'unavailable',
+  sourceName: 'Scam Sniffer',
+  sourceUrl: 'https://github.com/scamsniffer/scam-database',
+  publicDelayDays: 7,
+};
 const NEW_CONTRACT_DAYS = 30;
 
 export function classifySpenderRisk(input: {
@@ -26,15 +46,16 @@ export function classifySpenderRisk(input: {
   chainId?: number;
   isEoa?: boolean;
   createdAt?: number;
+  malicious?: boolean;
+  threat?: ThreatIntelligenceStatus;
   now: number;
 }): SpenderRisk {
-  const address = input.address.toLowerCase();
   const label = getSpenderLabel(input.address, input.chainId ?? 1);
 
   let level: RiskLevel;
   let reason: string;
 
-  if (BLOCKLIST.has(address)) {
+  if (input.malicious) {
     level = 'malicious';
     reason = '已知恶意地址，建议立即撤销';
   } else if (input.isEoa === true) {
@@ -68,6 +89,7 @@ export function classifySpenderRisk(input: {
     codeVerified: input.isEoa !== undefined,
     createdAt: input.createdAt,
     reason,
+    threat: input.threat ?? DEFAULT_THREAT_STATUS,
   };
 }
 
@@ -119,6 +141,8 @@ async function fetchSpenderRisk(
   });
 
   const createdMap: Record<string, number | null> = {};
+  const malicious = new Set<string>();
+  let threat = DEFAULT_THREAT_STATUS;
   for (let index = 0; index < unique.length; index += 25) {
     const chunk = unique.slice(index, index + 25);
     try {
@@ -127,7 +151,10 @@ async function fetchSpenderRisk(
       );
       if (!response.ok) continue;
       const json: unknown = await response.json();
-      Object.assign(createdMap, parseSpenderInfoPayload(json));
+      const parsed = parseSpenderInfoPayload(json);
+      Object.assign(createdMap, parsed.created);
+      parsed.malicious.forEach((address) => malicious.add(address));
+      if (parsed.threat.status === 'available') threat = parsed.threat;
     } catch {
       // Deployment age is optional; code verification is tracked separately.
     }
@@ -142,6 +169,8 @@ async function fetchSpenderRisk(
       chainId,
       isEoa: eoaByAddress[key],
       createdAt: createdMap[key] ?? undefined,
+      malicious: malicious.has(key),
+      threat,
       now,
     });
   }
@@ -150,10 +179,15 @@ async function fetchSpenderRisk(
 
 export function parseSpenderInfoPayload(
   value: unknown,
-): Record<string, number | null> {
-  if (!isRecord(value) || !isRecord(value.created)) return {};
+): SpenderInfoPayload {
+  const fallback: SpenderInfoPayload = {
+    created: {},
+    malicious: new Set(),
+    threat: DEFAULT_THREAT_STATUS,
+  };
+  if (!isRecord(value) || !isRecord(value.created)) return fallback;
 
-  const result: Record<string, number | null> = {};
+  const created: Record<string, number | null> = {};
   for (const [address, timestamp] of Object.entries(value.created)) {
     if (
       timestamp === null ||
@@ -161,8 +195,49 @@ export function parseSpenderInfoPayload(
         Number.isSafeInteger(timestamp) &&
         timestamp >= 0)
     ) {
-      result[address.toLowerCase()] = timestamp;
+      created[address.toLowerCase()] = timestamp;
     }
   }
-  return result;
+
+  const threatValue = value.threat;
+  if (!isRecord(threatValue)) {
+    return { ...fallback, created };
+  }
+  const source = threatValue.source;
+  if (!isRecord(source)) return { ...fallback, created };
+  const maliciousValues = threatValue.malicious;
+  const status = threatValue.status;
+  if (
+    (status !== 'available' && status !== 'unavailable') ||
+    !Array.isArray(maliciousValues) ||
+    !maliciousValues.every(
+      (address) => typeof address === 'string' && isAddress(address),
+    ) ||
+    typeof source.name !== 'string' ||
+    typeof source.repositoryUrl !== 'string' ||
+    typeof source.publicDelayDays !== 'number' ||
+    source.name !== 'Scam Sniffer' ||
+    source.repositoryUrl !== 'https://github.com/scamsniffer/scam-database'
+  ) {
+    return { ...fallback, created };
+  }
+
+  const checkedAt = threatValue.checkedAt;
+  return {
+    created,
+    malicious: new Set(
+      maliciousValues.map((address) => getAddress(address).toLowerCase()),
+    ),
+    threat: {
+      status,
+      sourceName: source.name,
+      sourceUrl: source.repositoryUrl,
+      publicDelayDays: source.publicDelayDays,
+      checkedAt:
+        typeof checkedAt === 'number' && Number.isSafeInteger(checkedAt)
+          ? checkedAt
+          : undefined,
+      stale: threatValue.stale === true,
+    },
+  };
 }

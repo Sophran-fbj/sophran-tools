@@ -51,7 +51,7 @@ export default function ApprovalsPage() {
 }
 
 function ApprovalsContent() {
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
   const searchParams = useSearchParams();
   const demoMode = searchParams.get('demo') === '1';
   const { address: connected, chainId: walletChainId } = useAccount();
@@ -98,6 +98,12 @@ function ApprovalsContent() {
     isError: isRiskError,
   } = useSpenderRisk(demoMode ? [] : spenders, effectiveChainId);
   const riskMap = demoMode ? demoRiskMap : liveRiskMap;
+  const threatStatus = Object.values(riskMap ?? {})[0]?.threat;
+  const threatUnavailable =
+    !demoMode &&
+    Object.values(riskMap ?? {}).some(
+      (risk) => risk.threat.status === 'unavailable',
+    );
   const pricedTokens = useMemo(
     () =>
       approvals
@@ -265,6 +271,39 @@ function ApprovalsContent() {
             {isRiskError && (
               <div className="alert alert-warning mb-4 text-sm" role="alert">
                 {t.approvals.riskUnavailable}
+              </div>
+            )}
+
+            {!isRiskError && threatUnavailable && (
+              <div className="alert alert-warning mb-4 text-sm" role="alert">
+                {t.approvals.threatUnavailable}
+              </div>
+            )}
+
+            {!demoMode && !isRiskError && threatStatus?.status === 'available' && (
+              <div className="mb-4 text-xs text-base-content/70">
+                {t.approvals.threatCoverage}:{' '}
+                <a
+                  className="link link-hover"
+                  href={threatStatus.sourceUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {threatStatus.sourceName}
+                </a>
+                {' · '}
+                {t.approvals.threatSourceDelay(threatStatus.publicDelayDays)}
+                {threatStatus.checkedAt && (
+                  <>
+                    {' · '}
+                    {t.approvals.threatCheckedAt(
+                      new Date(threatStatus.checkedAt).toLocaleString(
+                        locale === 'zh' ? 'zh-CN' : 'en-US',
+                      ),
+                    )}
+                  </>
+                )}
+                {threatStatus.stale && ` · ${t.approvals.threatSourceStale}`}
               </div>
             )}
 

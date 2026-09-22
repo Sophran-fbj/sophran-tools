@@ -47,7 +47,8 @@ TxRay focuses on **detect + explain**:
   - EOA spenders,
   - newly deployed unknown contracts,
   - unknown contracts,
-  - chain-scoped known-contract labels; the project does not currently claim live malicious-address intelligence.
+  - chain-scoped known-contract labels;
+  - Scam Sniffer public malicious-address intelligence (updated daily with an approximately 7-day public-data delay); failures degrade explicitly, and unknown never means safe.
 - Revoke ERC-20, NFT, and Permit2 approvals after enforcing the target chain and simulating the write.
 - Demo mode: `/tools/txray/approvals?demo=1`.
 
@@ -132,6 +133,7 @@ The project deliberately avoids monorepo complexity for now. There is only one d
 - Write operations are limited to revoke transactions initiated through the user's wallet.
 - Etherscan API key stays server-side.
 - Wallet addresses are not persisted or profiled. Approval and contract-info routes process query addresses transiently and send query parameters to Etherscan; RPC and CoinGecko requests are also subject to those providers' privacy policies.
+- Malicious-address checks periodically download Scam Sniffer's complete public list on the server and match locally; queried user addresses are not sent to the intelligence provider.
 - WalletConnect and Alchemy public keys are frontend keys and should be domain-restricted in provider dashboards.
 
 ## Local Development
