@@ -19,9 +19,10 @@ import {
   explorerAddressUrl,
 } from '@/features/txray/chains/chains';
 import { useI18n } from '@/lib/i18n/provider';
-
-const EXAMPLE =
-  '0x095ea7b3000000000000000000000000e592427a0aece92de3edee1f18e0157c05861564ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff';
+import {
+  APPROVE_EXAMPLE,
+  NESTED_MULTICALL_EXAMPLE,
+} from '@/features/txray/decoder/examples';
 
 export default function DecoderPage() {
   const { t } = useI18n();
@@ -76,13 +77,22 @@ export default function DecoderPage() {
         <div className="form-control mt-4">
           <label className="label" htmlFor="decoder-input">
             <span className="label-text">{t.decoder.inputLabel}</span>
-            <button
-              type="button"
-              className="link link-primary text-xs"
-              onClick={() => setInput(EXAMPLE)}
-            >
-              {t.decoder.sample}
-            </button>
+            <span className="flex flex-wrap justify-end gap-3">
+              <button
+                type="button"
+                className="link link-primary text-xs"
+                onClick={() => setInput(APPROVE_EXAMPLE)}
+              >
+                {t.decoder.approveSample}
+              </button>
+              <button
+                type="button"
+                className="link link-secondary text-xs"
+                onClick={() => setInput(NESTED_MULTICALL_EXAMPLE)}
+              >
+                {t.decoder.callTreeSample}
+              </button>
+            </span>
           </label>
           <textarea
             id="decoder-input"

@@ -27,7 +27,8 @@ export const messages = {
       approvalsDesc:
         '列出地址的代币授权，标记无限额度、Permit2、NFT 全集合授权和 spender 风险。',
       decoderTitle: '交易解码',
-      decoderDesc: '粘贴 calldata 或 tx hash，用人话解释这笔交易在干什么。',
+      decoderDesc:
+        '递归展开 multicall、Safe 和 ERC-4337 嵌套调用，用人话解释真实执行路径。',
       demoTitle: '快速看效果',
       demoDesc:
         '不连钱包也能看 TxRay 如何解释无限授权、Permit2 和 EOA spender 风险。',
@@ -35,6 +36,7 @@ export const messages = {
       articleTitle: '原理文章',
       articleDesc: '工具负责指出风险，文章负责解释为什么危险。',
       unlimitedApproval: '无限授权',
+      batchedTransactions: '嵌套调用',
     },
     approvals: {
       loadingPage: '加载授权检查器…',
@@ -120,7 +122,8 @@ export const messages = {
       description: '粘贴 calldata 或交易 hash，看清它在干什么',
       network: '交易所在网络',
       inputLabel: 'calldata 或 tx hash',
-      sample: '试试示例',
+      approveSample: '无限授权示例',
+      callTreeSample: '嵌套调用示例',
       placeholder: '0x095ea7b3… 或 0x 开头的 64 位交易哈希',
       loading: '解码中…',
       failed: '解码失败，请检查输入和所选网络。',
@@ -149,6 +152,7 @@ export const messages = {
         title: '调用树（静态解码）',
         staticNotice:
           '这是静态解码结果，不是交易执行模拟；解析成功不代表执行成功，更不代表资产安全。',
+        learnMore: '了解批量调用为什么容易隐藏风险',
         nodeCount: (count: number) => `共 ${count} 个节点`,
         incompleteBadge: (count: number) => `${count} 个未知/未完整`,
         expandAll: '全部展开',
@@ -388,7 +392,8 @@ export const messages = {
       approvalsDesc:
         'Find token approvals, unlimited allowances, Permit2 permissions, NFT collection approvals, and spender risk.',
       decoderTitle: 'Transaction decoder',
-      decoderDesc: 'Paste calldata or a transaction hash and inspect what it does.',
+      decoderDesc:
+        'Recursively expand multicall, Safe, and ERC-4337 calls to explain the real execution path.',
       demoTitle: 'Quick demo',
       demoDesc:
         'See how TxRay explains unlimited approvals, Permit2, and EOA spender risk without connecting a wallet.',
@@ -396,6 +401,7 @@ export const messages = {
       articleTitle: 'Explain the risks',
       articleDesc: 'The tools detect risks; the articles explain why they matter.',
       unlimitedApproval: 'Unlimited approvals',
+      batchedTransactions: 'Nested calls',
     },
     approvals: {
       loadingPage: 'Loading approval checker…',
@@ -481,7 +487,8 @@ export const messages = {
       description: 'Paste calldata or a transaction hash to inspect what it does',
       network: 'Transaction network',
       inputLabel: 'calldata or transaction hash',
-      sample: 'Use sample',
+      approveSample: 'Unlimited approval sample',
+      callTreeSample: 'Nested-call sample',
       placeholder: '0x095ea7b3… or a 0x-prefixed 64-character transaction hash',
       loading: 'Decoding…',
       failed: 'Decoding failed. Check the input and selected network.',
@@ -510,6 +517,7 @@ export const messages = {
         title: 'Call tree (static decoding)',
         staticNotice:
           'This is a static decoding result, not a transaction simulation. A successful decode does not mean the transaction will succeed or that assets are safe.',
+        learnMore: 'Why batched calls can hide risk',
         nodeCount: (count: number) => `${count} node${count === 1 ? '' : 's'}`,
         incompleteBadge: (count: number) =>
           `${count} unknown/incomplete`,

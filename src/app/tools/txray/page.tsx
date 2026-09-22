@@ -74,6 +74,12 @@ export default function TxRayPage() {
                 >
                   {t.txray.unlimitedApproval}
                 </Link>
+                <Link
+                  href="/articles/why-batched-transactions-hide-risk"
+                  className="btn btn-outline btn-sm"
+                >
+                  {t.txray.batchedTransactions}
+                </Link>
               </div>
             </div>
           </div>

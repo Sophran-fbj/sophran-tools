@@ -57,6 +57,8 @@ TxRay focuses on **detect + explain**:
 - Decode calldata directly.
 - Fetch and decode transaction input on the selected Ethereum, Base, Arbitrum, or Optimism network.
 - Recognize common selectors such as `approve`, `setApprovalForAll`, `permit`, `transferFrom`, and `transfer`.
+- Recursively expand Multicall3, `multicall(bytes[])`, Safe `execTransaction`, smart-account `execute/executeBatch`, and ERC-4337 `handleOps`, attaching findings to concrete call paths.
+- Enforce hard limits on recursion depth, node count, and raw-data previews; unknown, truncated, and incomplete paths expand by default and are never described as safe.
 - Highlight high-risk calls and explain what the function can authorize.
 - Fallback to an OpenChain signature lookup for unknown selectors.
 
@@ -78,6 +80,7 @@ TxRay focuses on **detect + explain**:
 
 - `/articles/why-unlimited-approval-is-dangerous`
 - `/articles/permit2-eip712-phishing`
+- `/articles/why-batched-transactions-hide-risk`
 
 The site supports Chinese and English through a lightweight local i18n provider.
 

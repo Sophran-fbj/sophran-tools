@@ -59,7 +59,7 @@ async function pasteCalldata(page: Page, calldata: string): Promise<void> {
 
 test('单层 calldata 显示调用树与静态解码声明', async ({ page }) => {
   await page.goto('/tools/txray/decoder');
-  await page.getByRole('button', { name: '试试示例' }).click();
+  await page.getByRole('button', { name: '无限授权示例' }).click();
 
   const tree = page.getByRole('tree');
   await expect(tree).toBeVisible();
@@ -68,6 +68,17 @@ test('单层 calldata 显示调用树与静态解码声明', async ({ page }) =>
   await expect(page.getByTestId('call-node')).toHaveCount(1);
   await expect(page.getByTestId('high-risk-badge')).toBeVisible();
   await expect(page.getByText('发现无限额度授权（max）')).toBeVisible();
+});
+
+test('产品示例可直接展开递归调用并进入解释文章', async ({ page }) => {
+  await page.goto('/tools/txray/decoder');
+  await page.getByRole('button', { name: '嵌套调用示例' }).click();
+
+  await expect(page.getByTestId('call-node')).toHaveCount(3);
+  await expect(page.getByText('发现无限额度授权（max）')).toBeVisible();
+  await expect(
+    page.getByRole('link', { name: '了解批量调用为什么容易隐藏风险' }),
+  ).toHaveAttribute('href', '/articles/why-batched-transactions-hide-risk');
 });
 
 test('嵌套 multicall：高风险路径默认展开并给出批量提示', async ({ page }) => {
@@ -153,7 +164,7 @@ test('键盘可展开与收起调用树', async ({ page }) => {
 test('中英文切换覆盖调用树文案', async ({ page }) => {
   await page.goto('/tools/txray/decoder');
   await page.getByRole('button', { name: 'English' }).click();
-  await page.getByRole('button', { name: 'Use sample' }).click();
+  await page.getByRole('button', { name: 'Unlimited approval sample' }).click();
 
   await expect(
     page.getByRole('heading', { name: 'Call tree (static decoding)' }),

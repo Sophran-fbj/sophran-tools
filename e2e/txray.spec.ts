@@ -38,7 +38,7 @@ test('approval rows switch between table rows and mobile cards', async ({ page }
 test('decoder localizes and decodes known calldata without a wallet', async ({ page }) => {
   await page.goto('/tools/txray/decoder');
   await page.getByRole('button', { name: 'English' }).click();
-  await page.getByRole('button', { name: 'Use sample' }).click();
+  await page.getByRole('button', { name: 'Unlimited approval sample' }).click();
 
   await expect(page.getByRole('heading', { name: 'Transaction decoder' })).toBeVisible();
   // 函数名同时出现在参数卡与调用树节点中，取第一个即可
@@ -51,7 +51,7 @@ test('decoder localizes and decodes known calldata without a wallet', async ({ p
 test('decoder parameters use cards on mobile', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'mobile-chromium', 'mobile layout assertion');
   await page.goto('/tools/txray/decoder');
-  await page.getByRole('button', { name: '试试示例' }).click();
+  await page.getByRole('button', { name: '无限授权示例' }).click();
 
   const firstParameter = page.locator('tbody tr').first();
   await expect(firstParameter).toHaveCSS('display', 'block');
