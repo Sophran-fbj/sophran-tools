@@ -113,7 +113,10 @@ function ApprovalsContent() {
         : [],
     [approvals],
   );
-  const { data: tokenPrices } = useTokenPrices(effectiveChainId, pricedTokens);
+  const { data: tokenPriceResult } = useTokenPrices(
+    effectiveChainId,
+    demoMode ? [] : pricedTokens,
+  );
 
   const canRevoke =
     !demoMode &&
@@ -307,6 +310,22 @@ function ApprovalsContent() {
               </div>
             )}
 
+            {tokenPriceResult?.coverage.status === 'unavailable' && (
+              <div className="alert alert-warning mb-4 text-sm" role="status">
+                {t.approvals.priceUnavailable}
+              </div>
+            )}
+
+            {tokenPriceResult?.coverage.status === 'partial' && (
+              <div className="alert alert-warning mb-4 text-sm" role="status">
+                {t.approvals.pricePartial(
+                  tokenPriceResult.coverage.priced,
+                  tokenPriceResult.coverage.requested,
+                  tokenPriceResult.coverage.omitted,
+                )}
+              </div>
+            )}
+
             {scanResult?.status === 'complete' && approvals?.length === 0 && (
               <div className="card bg-base-200">
                 <div className="card-body items-center text-center">
@@ -362,7 +381,11 @@ function ApprovalsContent() {
                           connected={connected}
                           walletChainId={walletChainId}
                           riskUnavailable={isRiskError}
-                          usdPrice={a.kind === 'nft' ? undefined : tokenPrices?.[a.token.toLowerCase()]}
+                          usdPrice={
+                            a.kind === 'nft'
+                              ? undefined
+                              : tokenPriceResult?.prices[a.token.toLowerCase()]
+                          }
                           risk={riskMap?.[a.spender.toLowerCase()]}
                         />
                       ))}

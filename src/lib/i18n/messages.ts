@@ -71,6 +71,10 @@ export const messages = {
       threatUnavailable:
         '公开恶意地址情报暂时不可用；未知不代表安全，请独立核实 spender。',
       threatCoverage: '恶意地址情报',
+      priceUnavailable:
+        '美元价格服务暂时不可用；授权与代币数量仍有效，但不会显示美元暴露估算。',
+      pricePartial: (priced: number, requested: number, omitted: number) =>
+        `美元价格仅覆盖 ${priced}/${requested} 个代币${omitted > 0 ? `，其中 ${omitted} 个超过查询预算` : ''}；未报价部分不会被当作零风险。`,
       cleanTitle: '✅ 很干净',
       cleanDescription: '该地址当前没有有效的代币授权。',
       approvalCount: (count: number) => `共 ${count} 条有效授权`,
@@ -436,6 +440,10 @@ export const messages = {
       threatUnavailable:
         'Public malicious-address intelligence is unavailable. Unknown does not mean safe; verify the spender independently.',
       threatCoverage: 'Malicious-address intelligence',
+      priceUnavailable:
+        'USD pricing is unavailable. Approval and token amounts remain valid, but USD exposure estimates are hidden.',
+      pricePartial: (priced: number, requested: number, omitted: number) =>
+        `USD prices cover ${priced} of ${requested} tokens${omitted > 0 ? `; ${omitted} exceeded the query budget` : ''}. Unpriced exposure is never treated as zero risk.`,
       cleanTitle: '✅ No active approvals found',
       cleanDescription: 'This address currently has no active token approvals in the complete scan.',
       approvalCount: (count: number) => `${count} active approval${count === 1 ? '' : 's'}`,

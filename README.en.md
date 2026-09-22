@@ -41,7 +41,7 @@ TxRay focuses on **detect + explain**:
 - Detect NFT `setApprovalForAll` collection-level approvals.
 - Inspect Uniswap Permit2 internal allowances.
 - Support Ethereum, Base, Arbitrum, and Optimism.
-- Estimate `$ at risk` with `min(current balance, allowance)`, and convert it to USD through CoinGecko when pricing is available.
+- Estimate `$ at risk` with `min(current balance, allowance)`, using server-side batched and cached CoinGecko pricing plus explicit complete, partial, or unavailable coverage states.
 - Classify spender risk:
   - known trusted contracts,
   - EOA spenders,
@@ -127,7 +127,7 @@ The project deliberately avoids monorepo complexity for now. There is only one d
 | Spender creation info | Server route -> Etherscan | Keeps API key server-side. |
 | Calldata decoding | Browser + signature lookup route | Local known selector map first, fallback to OpenChain. |
 | EIP-712 analysis | Browser only | Pure JSON inspection; no RPC or signing required. |
-| Token prices | Browser -> CoinGecko | Used only for `$ at risk`; falls back to token amount if pricing fails. |
+| Token prices | Browser -> batched server cache -> CoinGecko | Used only for `$ at risk`; missing or failed pricing reports coverage explicitly and falls back to token amounts. |
 
 ## Security Posture
 
@@ -135,7 +135,7 @@ The project deliberately avoids monorepo complexity for now. There is only one d
 - Read-only analysis by default.
 - Write operations are limited to revoke transactions initiated through the user's wallet.
 - Etherscan API key stays server-side.
-- Wallet addresses are not persisted or profiled. Approval and contract-info routes process query addresses transiently and send query parameters to Etherscan; RPC and CoinGecko requests are also subject to those providers' privacy policies.
+- Wallet addresses are not persisted or profiled. Approval and contract-info routes process query addresses transiently and send query parameters to Etherscan. RPC requests remain subject to node-provider policies; the pricing route sends only token contract addresses, never wallet addresses, to CoinGecko.
 - Malicious-address checks periodically download Scam Sniffer's complete public list on the server and match locally; queried user addresses are not sent to the intelligence provider.
 - WalletConnect and Alchemy public keys are frontend keys and should be domain-restricted in provider dashboards.
 
@@ -154,6 +154,7 @@ Required environment variables:
 | `NEXT_PUBLIC_WC_PROJECT_ID` | Reown / WalletConnect Project ID for RainbowKit |
 | `NEXT_PUBLIC_ALCHEMY_ID` | Alchemy RPC key |
 | `ETHERSCAN_API_KEY` | Etherscan V2 API key used by server routes |
+| `COINGECKO_DEMO_API_KEY` | Optional but recommended CoinGecko Demo API key, server-side only; without it, keyless mode fills one uncached token per request and reports partial coverage explicitly |
 | `DEV_PROXY` | Optional local HTTP/mixed proxy for mainland-China development |
 | `UPSTASH_REDIS_REST_URL` | Optional; shares rate limits, Etherscan pacing, and short-lived approval cache across production instances |
 | `UPSTASH_REDIS_REST_TOKEN` | Optional; matching Redis REST write token, server-side only |
@@ -172,6 +173,7 @@ Without Redis, the service falls back to process-local rate limits, request paci
 
 - Etherscan log scans are capped at 10,000 records per event class. Reaching the cap produces an explicit incomplete-scan warning and never a clean result.
 - Trusted spender labels currently apply only to Ethereum mainnet; other chains default to unknown.
+- One approval scan queries USD prices for at most 500 unique tokens, in server batches of up to 100. Over-budget, unpriced, or upstream-limited keyless tokens produce partial coverage and are never treated as zero risk.
 - Signature Risk expands structures and arrays from EIP-712 `types`. Without a schema, it performs conservative field scanning and displays a limitation warning.
 
 ## Verification
@@ -190,7 +192,7 @@ Run `pnpm exec playwright install chromium` before the first E2E run. GitHub Act
 
 - Add more real spender labels and a public drainer/blocklist source.
 - Add more chains after Ethereum / Base / Arbitrum / Optimism are stable.
-- Improve `$ at risk` caching and token price coverage.
+- Add a second price source beyond CoinGecko and surface quality warnings for low-liquidity quotes.
 - Improve article authoring with MDX once content grows.
 
 ## License
