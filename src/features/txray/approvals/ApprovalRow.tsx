@@ -67,6 +67,20 @@ export function ApprovalRow({
             {formatRiskReason(risk, t.approvals)}
           </div>
         )}
+        {risk?.level === 'malicious' && (
+          <div className="mt-1 text-xs text-base-content/70">
+            <a
+              className="link link-hover"
+              href={risk.threat.sourceUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {risk.threat.sourceName}
+            </a>{' '}
+            · {t.approvals.threatSourceDelay(risk.threat.publicDelayDays)}
+            {risk.threat.stale && ` · ${t.approvals.threatSourceStale}`}
+          </div>
+        )}
       </td>
       <td className={`${cellClass} md:text-right`}>
         <MobileLabel>{t.approvals.allowance}</MobileLabel>

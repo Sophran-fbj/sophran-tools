@@ -66,6 +66,9 @@ export const messages = {
       warningBalances: (count: number) =>
         `${count} 个代币的余额读取失败，暴露金额未知。`,
       riskUnavailable: 'spender 风险画像暂时不可用；授权额度仍来自链上实时读取。',
+      threatUnavailable:
+        '公开恶意地址情报暂时不可用；未知不代表安全，请独立核实 spender。',
+      threatCoverage: '恶意地址情报',
       cleanTitle: '✅ 很干净',
       cleanDescription: '该地址当前没有有效的代币授权。',
       approvalCount: (count: number) => `共 ${count} 条有效授权`,
@@ -104,6 +107,9 @@ export const messages = {
       riskNew: '新合约',
       riskUnknown: '未知合约',
       reasonMalicious: '已知恶意地址，建议立即撤销。',
+      threatSourceDelay: (days: number) => `公开数据约延迟 ${days} 天`,
+      threatCheckedAt: (date: string) => `检查于 ${date}`,
+      threatSourceStale: '当前使用缓存数据',
       reasonEoa: '被授权方是普通钱包而不是合约；正常 dApp 很少需要这种授权。',
       reasonRpcUnavailable: 'RPC 未能验证该地址是否为合约，请稍后重试。',
       reasonNew: (days: number) => `合约仅 ${days} 天前部署，谨慎对待。`,
@@ -421,6 +427,9 @@ export const messages = {
       warningBalances: (count: number) =>
         `${count} token balance reads failed, so their exposure is unknown.`,
       riskUnavailable: 'Spender risk profiles are unavailable; allowances still come from live onchain reads.',
+      threatUnavailable:
+        'Public malicious-address intelligence is unavailable. Unknown does not mean safe; verify the spender independently.',
+      threatCoverage: 'Malicious-address intelligence',
       cleanTitle: '✅ No active approvals found',
       cleanDescription: 'This address currently has no active token approvals in the complete scan.',
       approvalCount: (count: number) => `${count} active approval${count === 1 ? '' : 's'}`,
@@ -459,6 +468,9 @@ export const messages = {
       riskNew: 'New contract',
       riskUnknown: 'Unknown contract',
       reasonMalicious: 'This address is known to be malicious. Revoke immediately.',
+      threatSourceDelay: (days: number) => `public data is delayed by about ${days} days`,
+      threatCheckedAt: (date: string) => `checked ${date}`,
+      threatSourceStale: 'using cached data',
       reasonEoa: 'The spender is a wallet, not a contract. Legitimate dApps rarely need this permission.',
       reasonRpcUnavailable: 'RPC could not verify whether this address is a contract. Try again later.',
       reasonNew: (days: number) => `This contract was deployed only ${days} day${days === 1 ? '' : 's'} ago.`,

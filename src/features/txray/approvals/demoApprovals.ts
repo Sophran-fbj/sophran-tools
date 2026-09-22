@@ -2,6 +2,14 @@ import { getAddress } from 'viem';
 import type { Approval } from './useApprovals';
 import type { SpenderRisk } from './useSpenderRisk';
 
+const DEMO_THREAT: SpenderRisk['threat'] = {
+  status: 'available',
+  sourceName: 'Scam Sniffer',
+  sourceUrl: 'https://github.com/scamsniffer/scam-database',
+  publicDelayDays: 7,
+  checkedAt: 1_700_000_000_000,
+};
+
 export const demoApprovals: Approval[] = [
   {
     kind: 'erc20',
@@ -47,6 +55,7 @@ export const demoRiskMap: Record<string, SpenderRisk> = {
     isEoa: false,
     codeVerified: true,
     reason: 'Uniswap V3 Router',
+    threat: DEMO_THREAT,
   },
   ['0xEf1c6E67703c7BD7107eed8303Fbe6EC2554BF6B'.toLowerCase()]: {
     level: 'known',
@@ -54,12 +63,14 @@ export const demoRiskMap: Record<string, SpenderRisk> = {
     isEoa: false,
     codeVerified: true,
     reason: 'Uniswap Universal Router',
+    threat: DEMO_THREAT,
   },
   ['0xFb3C2B2769A2119f349233A44A640F090C907667'.toLowerCase()]: {
     level: 'eoa',
     isEoa: true,
     codeVerified: true,
     reason: '被授权方是普通钱包（无合约代码）——正常 dApp 不会这样，极可能是钓鱼',
+    threat: DEMO_THREAT,
   },
 };
 
