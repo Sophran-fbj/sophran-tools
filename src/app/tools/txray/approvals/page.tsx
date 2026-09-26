@@ -24,6 +24,11 @@ import { ApprovalRow } from '@/features/txray/approvals/ApprovalRow';
 import { AppearanceControls } from '@/components/AppearanceControls';
 import { useI18n } from '@/lib/i18n/provider';
 import type { ApprovalWarning } from '@/features/txray/approvals/types';
+import {
+  selectApprovals,
+  type ApprovalFilter,
+  type ApprovalSort,
+} from '@/features/txray/approvals/viewOptions';
 
 export default function ApprovalsPage() {
   const { t } = useI18n();
@@ -57,6 +62,8 @@ function ApprovalsContent() {
   const { address: connected, chainId: walletChainId } = useAccount();
   const [input, setInput] = useState('');
   const [selectedChainId, setSelectedChainId] = useState(DEFAULT_TXRAY_CHAIN_ID);
+  const [filter, setFilter] = useState<ApprovalFilter>('all');
+  const [sort, setSort] = useState<ApprovalSort>('risk');
   const effectiveChainId = demoMode ? DEFAULT_TXRAY_CHAIN_ID : selectedChainId;
   const chain = getTxRayChain(effectiveChainId);
 
@@ -116,6 +123,10 @@ function ApprovalsContent() {
   const { data: tokenPriceResult } = useTokenPrices(
     effectiveChainId,
     demoMode ? [] : pricedTokens,
+  );
+  const visibleApprovals = useMemo(
+    () => selectApprovals(approvals ?? [], riskMap, tokenPriceResult?.prices, filter, sort),
+    [approvals, riskMap, tokenPriceResult?.prices, filter, sort],
   );
 
   const canRevoke =
@@ -361,6 +372,48 @@ function ApprovalsContent() {
                   </details>
                 )}
 
+                <div className="mb-3 grid gap-3 sm:grid-cols-2">
+                  <div className="form-control">
+                    <label className="label" htmlFor="approval-filter">
+                      <span className="label-text">{t.approvals.filterLabel}</span>
+                    </label>
+                    <select
+                      id="approval-filter"
+                      className="select select-bordered w-full"
+                      value={filter}
+                      onChange={(event) => setFilter(event.target.value as ApprovalFilter)}
+                    >
+                      <option value="all">{t.approvals.filterAll}</option>
+                      <option value="attention">{t.approvals.filterAttention}</option>
+                      <option value="unlimited">{t.approvals.filterUnlimited}</option>
+                    </select>
+                  </div>
+                  <div className="form-control">
+                    <label className="label" htmlFor="approval-sort">
+                      <span className="label-text">{t.approvals.sortLabel}</span>
+                    </label>
+                    <select
+                      id="approval-sort"
+                      className="select select-bordered w-full"
+                      value={sort}
+                      onChange={(event) => setSort(event.target.value as ApprovalSort)}
+                    >
+                      <option value="risk">{t.approvals.sortRisk}</option>
+                      <option value="exposure">{t.approvals.sortExposure}</option>
+                      <option value="asset">{t.approvals.sortAsset}</option>
+                    </select>
+                  </div>
+                </div>
+                <p className="mb-3 text-xs text-base-content/70" role="status">
+                  {t.approvals.visibleCount(visibleApprovals.length, approvals.length)}
+                  {sort === 'exposure' && ` · ${t.approvals.exposureSortNote}`}
+                </p>
+                {canRevoke && (
+                  <p className="mb-3 text-xs text-base-content/70">
+                    {t.approvals.revokeEffect}
+                  </p>
+                )}
+
                 <div className="rounded-box border border-base-300 md:overflow-x-auto">
                   <table className="table block md:table" aria-label={t.approvals.title}>
                     <thead className="hidden md:table-header-group">
@@ -372,7 +425,7 @@ function ApprovalsContent() {
                       </tr>
                     </thead>
                     <tbody className="block space-y-3 p-3 md:table-row-group md:space-y-0 md:p-0">
-                      {approvals.map((a) => (
+                      {visibleApprovals.map((a) => (
                         <ApprovalRow
                           key={a.id}
                           approval={a}
@@ -392,6 +445,11 @@ function ApprovalsContent() {
                     </tbody>
                   </table>
                 </div>
+                {visibleApprovals.length === 0 && (
+                  <p className="mt-3 text-sm text-base-content/70">
+                    {t.approvals.noFilterResults}
+                  </p>
+                )}
               </>
             )}
           </div>
