@@ -46,9 +46,8 @@ const HANDLE_OPS = encodeHandleOpsPacked([
 ]);
 
 async function fillCalldata(page: Page, calldata: string): Promise<void> {
-  await page
-    .getByLabel(/calldata 或 tx hash|calldata or transaction hash/)
-    .fill(calldata);
+  await page.getByRole('button', { name: 'calldata', exact: true }).click();
+  await page.getByLabel('calldata', { exact: true }).fill(calldata);
   await expect(page.getByTestId('static-decode-notice')).toBeVisible();
 }
 

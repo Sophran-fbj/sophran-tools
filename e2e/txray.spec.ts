@@ -35,6 +35,14 @@ test('approval rows switch between table rows and mobile cards', async ({ page }
   await expect(firstRow.getByTitle('连接该地址的钱包才能撤销')).toBeDisabled();
 });
 
+test('approval sorting changes display order without losing entries', async ({ page }) => {
+  await page.goto('/tools/txray/approvals?demo=1');
+  await page.getByLabel('排序').selectOption('asset');
+  await expect(page.locator('tbody tr')).toHaveCount(3);
+  await expect(page.locator('tbody tr').first()).toContainText('BAYC');
+  await expect(page.getByText('显示 3 / 3 条授权')).toBeVisible();
+});
+
 test('decoder localizes and decodes known calldata without a wallet', async ({ page }) => {
   await page.goto('/tools/txray/decoder');
   await page.getByRole('button', { name: 'English' }).click();
@@ -56,4 +64,14 @@ test('decoder parameters use cards on mobile', async ({ page }, testInfo) => {
   const firstParameter = page.locator('tbody tr').first();
   await expect(firstParameter).toHaveCSS('display', 'block');
   await expect(firstParameter.getByText('参数:', { exact: true })).toBeVisible();
+});
+
+test('decoder keeps transaction hashes and calldata in separate input modes', async ({ page }) => {
+  await page.goto('/tools/txray/decoder');
+  await page.getByLabel('交易哈希', { exact: true }).fill('0x095ea7b3');
+  await expect(page.getByText(/请输入 0x 开头、后接 64 位/)).toBeVisible();
+  await page.getByRole('button', { name: 'calldata', exact: true }).click();
+  await expect(page.getByLabel('calldata', { exact: true })).toHaveValue('');
+  await page.getByRole('button', { name: '无限授权示例' }).click();
+  await expect(page.getByText(/仅解读粘贴的 calldata/)).toBeVisible();
 });
