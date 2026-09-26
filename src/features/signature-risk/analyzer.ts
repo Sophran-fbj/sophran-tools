@@ -104,34 +104,24 @@ export function analyzeTypedData(input: string): SignatureAnalysis {
     'Signature Risk cannot confidently classify this typed-data payload. Review every address, amount, and deadline before signing.';
 
   if (permitKind === 'permit2') {
-    danger = signatureExpired
-      ? 'low'
-      : hasUnlimited || (hasSpender && hasPositiveAmount)
-        ? 'high'
-        : 'medium';
+    danger = hasUnlimited || (hasSpender && hasPositiveAmount)
+      ? 'high'
+      : 'medium';
     riskKind = 'permit2';
     title = 'Permit2 token spending approval';
-    explain = signatureExpired
-      ? 'The signature deadline has passed, so this Permit2 payload can no longer be submitted successfully.'
-      : 'This signature can grant a spender permission through Uniswap Permit2. It may move tokens later without a separate approval transaction.';
+    explain = 'This signature can grant a spender permission through Uniswap Permit2. It may move tokens later without a separate approval transaction.';
   } else if (permitKind === 'erc20-permit') {
-    danger = signatureExpired
-      ? 'low'
-      : hasUnlimited || (hasSpender && hasPositiveAmount)
-        ? 'high'
-        : 'medium';
+    danger = hasUnlimited || (hasSpender && hasPositiveAmount)
+      ? 'high'
+      : 'medium';
     riskKind = 'erc20-permit';
     title = 'ERC-20 permit approval';
-    explain = signatureExpired
-      ? 'The permit deadline has passed, so this signature can no longer create an allowance.'
-      : 'This signature can approve token spending without sending an on-chain approve transaction first.';
+    explain = 'This signature can approve token spending without sending an on-chain approve transaction first.';
   } else if (permitKind === 'nft-order') {
-    danger = signatureExpired ? 'low' : 'high';
+    danger = 'high';
     riskKind = 'nft-order';
     title = 'NFT or order signature';
-    explain = signatureExpired
-      ? 'The order deadline has passed, so this payload should no longer be executable.'
-      : 'This looks like an order-style signature. Signing can authorize a marketplace or conduit to move NFTs or settle an order.';
+    explain = 'This looks like an order-style signature. Signing can authorize a marketplace or conduit to move NFTs or settle an order.';
   } else if (hasOperator) {
     danger = 'high';
     riskKind = 'operator';
@@ -454,9 +444,9 @@ function deadlineFinding(value: unknown, path: string): FieldFinding {
     label: 'Deadline',
     kind: 'deadline',
     value: expired ? `${date} (expired)` : `${date} (${days} days)`,
-    severity: expired ? 'low' : farFuture ? 'medium' : 'low',
+    severity: expired ? 'unknown' : farFuture ? 'medium' : 'low',
     explain: expired
-      ? 'This deadline has passed, so the signature should no longer be usable.'
+      ? 'This deadline has passed, but this tool cannot verify how the receiving contract handles it.'
       : farFuture
         ? 'Long-lived signatures are riskier because they remain usable far into the future.'
         : 'The signature expires relatively soon.',

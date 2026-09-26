@@ -239,7 +239,10 @@ function AnalysisView({ data }: { data: SignatureAnalysis }) {
         <div>
           <div className="font-bold">{riskTitle(t, data.riskKind)}</div>
           <div className="text-sm">
-            {data.signatureExpired ? copy.expiredExplain : riskExplain(t, data.riskKind)}
+            {riskExplain(t, data.riskKind)}
+            {data.signatureExpired && (
+              <p className="mt-2">{copy.expiredExplain}</p>
+            )}
           </div>
         </div>
       </div>

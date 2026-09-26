@@ -19,3 +19,18 @@ test('signature input explains its limits and distinguishes invalid from partial
   await expect(page.getByText('ERC-20 permit 授权', { exact: true })).toBeVisible();
   await expect(page.getByText(/只显示识别到的字段线索/)).toHaveCount(0);
 });
+
+test('an expired field does not turn a permit into a low-risk verdict', async ({ page }) => {
+  await page.goto('/tools/signature-risk');
+  await page.getByRole('button', { name: 'ERC-20 permit 示例' }).click();
+
+  const input = page.getByLabel('Typed-data JSON');
+  const payload = JSON.parse(await input.inputValue());
+  payload.message.deadline = '1';
+  await input.fill(JSON.stringify(payload));
+  await page.getByRole('button', { name: '分析', exact: true }).click();
+
+  await expect(page.locator('.alert-error').filter({ hasText: 'ERC-20 permit 授权' }))
+    .toBeVisible();
+  await expect(page.getByText(/不能据此认定签名已失效或安全/)).toBeVisible();
+});

@@ -143,7 +143,7 @@ describe('analyzeTypedData', () => {
     );
   });
 
-  it('marks an expired permit as low risk instead of long-lived', () => {
+  it('does not treat an unverified expired deadline as proof of low risk', () => {
     const result = analyzeTypedData(
       JSON.stringify({
         domain: { name: 'USD Coin' },
@@ -158,12 +158,25 @@ describe('analyzeTypedData', () => {
     );
 
     expect(result.signatureExpired).toBe(true);
-    expect(result.danger).toBe('low');
+    expect(result.schemaValidated).toBe(false);
+    expect(result.danger).toBe('high');
     expect(result.findings).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ kind: 'deadline', expired: true, severity: 'low' }),
+        expect.objectContaining({ kind: 'deadline', expired: true, severity: 'unknown' }),
       ]),
     );
+  });
+
+  it('keeps order-style signatures high risk when a claimed deadline has passed', () => {
+    const result = analyzeTypedData(JSON.stringify({
+      domain: { name: 'Seaport' },
+      primaryType: 'Order',
+      message: { deadline: '1' },
+    }));
+
+    expect(result.signatureExpired).toBe(true);
+    expect(result.riskKind).toBe('nft-order');
+    expect(result.danger).toBe('high');
   });
 
   it('does not pretend unknown typed data is classified', () => {

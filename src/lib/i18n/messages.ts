@@ -75,8 +75,8 @@ export const messages = {
         '美元价格服务暂时不可用；授权与代币数量仍有效，但不会显示美元暴露估算。',
       pricePartial: (priced: number, requested: number, omitted: number) =>
         `美元价格仅覆盖 ${priced}/${requested} 个代币${omitted > 0 ? `，其中 ${omitted} 个超过查询预算` : ''}；未报价部分不会被当作零风险。`,
-      cleanTitle: '✅ 很干净',
-      cleanDescription: '该地址当前没有有效的代币授权。',
+      cleanTitle: '本次未发现有效授权',
+      cleanDescription: '在本次覆盖的 ERC-20、NFT 全集合和 Permit2 授权中未发现有效条目；这不代表钱包整体安全。',
       approvalCount: (count: number) => `共 ${count} 条有效授权`,
       visibleCount: (visible: number, total: number) => `显示 ${visible} / ${total} 条授权`,
       filterLabel: '筛选授权',
@@ -350,7 +350,7 @@ export const messages = {
       noFields:
         '未检测到常见 permit 或 operator 字段。签名前仍需检查原始 message。',
       schemaFallback: '缺少完整的 types schema 或 primaryType：下方只显示识别到的字段线索，无法完整判断这次签名；不要据此认定它安全。',
-      expiredExplain: '签名截止时间已经过去，这段 payload 应无法再成功执行。',
+      expiredExplain: '输入中的截止时间已过，但本站未验证接收合约如何处理它，不能据此认定签名已失效或安全。',
       chainId: 'Chain ID',
       field: '字段',
       value: '值',
@@ -476,8 +476,8 @@ export const messages = {
         'USD pricing is unavailable. Approval and token amounts remain valid, but USD exposure estimates are hidden.',
       pricePartial: (priced: number, requested: number, omitted: number) =>
         `USD prices cover ${priced} of ${requested} tokens${omitted > 0 ? `; ${omitted} exceeded the query budget` : ''}. Unpriced exposure is never treated as zero risk.`,
-      cleanTitle: '✅ No active approvals found',
-      cleanDescription: 'This address currently has no active token approvals in the complete scan.',
+      cleanTitle: 'No active approvals found in this scan',
+      cleanDescription: 'No active ERC-20, collection-wide NFT, or Permit2 approvals were found within this scan’s coverage. This does not establish overall wallet safety.',
       approvalCount: (count: number) => `${count} active approval${count === 1 ? '' : 's'}`,
       visibleCount: (visible: number, total: number) => `Showing ${visible} of ${total} approvals`,
       filterLabel: 'Filter approvals',
@@ -753,7 +753,7 @@ export const messages = {
         'No common permit or operator fields were detected. Inspect the raw message before signing.',
       schemaFallback:
         'A complete types schema or primaryType is missing. Only recognizable fields are shown below; this is not a complete assessment and must not be treated as safe.',
-      expiredExplain: 'The signature deadline has passed, so this payload should no longer execute.',
+      expiredExplain: 'The deadline in this input has passed, but this tool has not verified how the receiving contract handles it. Do not treat the signature as invalid or safe on that basis alone.',
       chainId: 'Chain ID',
       field: 'Field',
       value: 'Value',

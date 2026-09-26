@@ -171,10 +171,10 @@ Without Redis, the service falls back to process-local rate limits, request paci
 
 ## Known Limitations
 
-- Etherscan log scans are capped at 10,000 records per event class. Reaching the cap produces an explicit incomplete-scan warning and never a clean result.
+- Etherscan log scans are capped at 10,000 records per event class. Reaching the cap produces an explicit incomplete-scan warning and no "no active approvals found" conclusion.
 - Trusted spender labels currently apply only to Ethereum mainnet; other chains default to unknown.
 - One approval scan queries USD prices for at most 500 unique tokens, in server batches of up to 100. Over-budget, unpriced, or upstream-limited keyless tokens produce partial coverage and are never treated as zero risk.
-- Signature Risk expands structures and arrays from EIP-712 `types`. Without a schema, it performs conservative field scanning and displays a limitation warning.
+- Signature Risk expands structures and arrays from EIP-712 `types`. Without a schema, it performs conservative field scanning and displays a limitation warning. A deadline that has passed does not prove the receiving contract will reject the signature, so it does not automatically lower the overall risk level.
 
 ## Verification
 
