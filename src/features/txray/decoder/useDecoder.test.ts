@@ -25,6 +25,19 @@ describe('decodeInput', () => {
     );
   });
 
+  it('keeps 32-byte calldata as calldata when the mode is explicit', async () => {
+    const bytes = `0x095ea7b3${'0'.repeat(56)}`;
+    const client = { getTransaction: vi.fn() } as unknown as PublicClient;
+    const result = await decodeInput(client, bytes, vi.fn(), 'calldata');
+    expect(result.source).toBe('calldata');
+    expect(client.getTransaction).not.toHaveBeenCalled();
+  });
+
+  it('does not interpret incomplete hashes as calldata in transaction mode', async () => {
+    await expect(decodeInput(undefined, '0x095ea7b3', vi.fn(), 'tx'))
+      .rejects.toThrow('不是有效的交易哈希');
+  });
+
   it('resolves tx hash input and carries the transaction value', async () => {
     const lookup = vi.fn();
     const client = {

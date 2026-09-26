@@ -39,28 +39,40 @@ export interface DecodedResult {
 }
 
 type SignatureLookup = (selector: string) => Promise<string | null>;
+export type DecoderInputMode = 'tx' | 'calldata';
 
-function isTxHash(value: string): value is Hash {
+export class NoCalldataError extends Error {
+  constructor() {
+    super('这是一笔普通转账（没有 calldata 可解码）');
+    this.name = 'NoCalldataError';
+  }
+}
+
+export function isTxHash(value: string): value is Hash {
   return /^0x[0-9a-fA-F]{64}$/.test(value);
 }
 
-function isCalldata(value: string): value is Hex {
+export function isCalldata(value: string): value is Hex {
   return /^0x[0-9a-fA-F]{8,}$/.test(value) && (value.length - 2) % 2 === 0;
 }
 
-export function useDecoder(input: string, chainId = 1) {
+export function useDecoder(input: string, chainId = 1, mode?: DecoderInputMode) {
   const client = usePublicClient({ chainId });
   const value = input.trim();
-  const enabled = Boolean(client) && value.startsWith('0x') && value.length >= 10;
+  const enabled = Boolean(client) && (mode === 'tx'
+    ? isTxHash(value)
+    : mode === 'calldata'
+      ? isCalldata(value)
+      : value.startsWith('0x') && value.length >= 10);
 
   return useQuery<DecodedResult>({
-    queryKey: ['decode', chainId, value.toLowerCase()],
+    queryKey: ['decode', chainId, mode ?? 'auto', value.toLowerCase()],
     enabled,
     staleTime: 60_000,
     retry: false,
     queryFn: async () => {
       if (!client) throw new Error('目标链 RPC 不可用');
-      return decodeInput(client, value);
+      return decodeInput(client, value, fetchSignature, mode);
     },
   });
 }
@@ -69,13 +81,15 @@ export async function decodeInput(
   client: PublicClient | undefined,
   value: string,
   lookupSignature: SignatureLookup = fetchSignature,
+  mode?: DecoderInputMode,
 ): Promise<DecodedResult> {
   let calldata: string;
   let to: Address | undefined;
   let source: 'calldata' | 'tx';
   let txValue: bigint | null | undefined;
 
-  if (isTxHash(value)) {
+  if (mode === 'tx' || (!mode && isTxHash(value))) {
+    if (!isTxHash(value)) throw new Error('不是有效的交易哈希');
     if (!client) throw new Error('读取交易 hash 需要目标链 RPC');
     source = 'tx';
     const transaction = await client.getTransaction({ hash: value });
@@ -83,7 +97,7 @@ export async function decodeInput(
     to = transaction.to ?? undefined;
     txValue = transaction.value ?? null;
     if (!calldata || calldata === '0x') {
-      throw new Error('这是一笔普通转账（没有 calldata 可解码）');
+      throw new NoCalldataError();
     }
   } else {
     source = 'calldata';

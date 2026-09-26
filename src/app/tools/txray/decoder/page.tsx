@@ -7,7 +7,11 @@ import { WalletButton } from '@/components/WalletButton';
 import { AppearanceControls } from '@/components/AppearanceControls';
 import {
   isMaxUintValue,
+  isTxHash,
+  isCalldata,
+  NoCalldataError,
   useDecoder,
+  type DecoderInputMode,
   type DecodedParam,
   type DecodedResult,
 } from '@/features/txray/decoder/useDecoder';
@@ -26,11 +30,15 @@ import {
 
 export default function DecoderPage() {
   const { t } = useI18n();
-  const [input, setInput] = useState('');
+  const [mode, setMode] = useState<DecoderInputMode>('tx');
+  const [txInput, setTxInput] = useState('');
+  const [calldataInput, setCalldataInput] = useState('');
   const [chainId, setChainId] = useState(DEFAULT_TXRAY_CHAIN_ID);
-  const { data, isLoading, isError } = useDecoder(input, chainId);
+  const input = mode === 'tx' ? txInput : calldataInput;
+  const { data, isLoading, isError, error } = useDecoder(input, chainId, mode);
   const value = input.trim();
-  const showResult = value.startsWith('0x') && value.length >= 10;
+  const inputValid = mode === 'tx' ? isTxHash(value) : isCalldata(value);
+  const showResult = inputValid;
 
   return (
     <main className="min-h-screen bg-base-100 px-4 py-8 sm:px-6 sm:py-12">
@@ -74,34 +82,68 @@ export default function DecoderPage() {
           </select>
         </div>
 
+        <fieldset className="mt-4">
+          <legend className="label-text mb-2">{t.decoder.inputType}</legend>
+          <div className="join" aria-label={t.decoder.inputType}>
+            <button
+              type="button"
+              className={`btn join-item btn-sm ${mode === 'tx' ? 'btn-primary' : 'btn-outline'}`}
+              aria-pressed={mode === 'tx'}
+              onClick={() => setMode('tx')}
+            >
+              {t.decoder.txMode}
+            </button>
+            <button
+              type="button"
+              className={`btn join-item btn-sm ${mode === 'calldata' ? 'btn-primary' : 'btn-outline'}`}
+              aria-pressed={mode === 'calldata'}
+              onClick={() => setMode('calldata')}
+            >
+              {t.decoder.calldataMode}
+            </button>
+          </div>
+        </fieldset>
+
         <div className="form-control mt-4">
           <label className="label" htmlFor="decoder-input">
-            <span className="label-text">{t.decoder.inputLabel}</span>
-            <span className="flex flex-wrap justify-end gap-3">
-              <button
-                type="button"
-                className="link link-primary text-xs"
-                onClick={() => setInput(APPROVE_EXAMPLE)}
-              >
-                {t.decoder.approveSample}
-              </button>
-              <button
-                type="button"
-                className="link link-secondary text-xs"
-                onClick={() => setInput(NESTED_MULTICALL_EXAMPLE)}
-              >
-                {t.decoder.callTreeSample}
-              </button>
-            </span>
+            <span className="label-text">{mode === 'tx' ? t.decoder.txMode : t.decoder.calldataMode}</span>
           </label>
           <textarea
             id="decoder-input"
             value={input}
-            onChange={(event) => setInput(event.target.value)}
-            placeholder={t.decoder.placeholder}
+            onChange={(event) => mode === 'tx'
+              ? setTxInput(event.target.value)
+              : setCalldataInput(event.target.value)}
+            placeholder={mode === 'tx' ? t.decoder.txPlaceholder : t.decoder.calldataPlaceholder}
             className="textarea textarea-bordered min-h-24 w-full break-all font-mono text-sm"
             spellCheck={false}
+            aria-invalid={value.length > 0 && !inputValid}
+            aria-describedby="decoder-input-help"
           />
+          <p id="decoder-input-help" className="mt-2 text-xs text-base-content/70">
+            {mode === 'tx' ? t.decoder.txHelp : t.decoder.calldataHelp}
+          </p>
+          {value.length > 0 && !inputValid && (
+            <p className="mt-2 text-sm text-error" role="alert">
+              {mode === 'tx' ? t.decoder.invalidTxHash : t.decoder.invalidCalldata}
+            </p>
+          )}
+          <div className="mt-2 flex flex-wrap gap-3">
+            <button
+              type="button"
+              className="link link-primary text-xs"
+              onClick={() => { setMode('calldata'); setCalldataInput(APPROVE_EXAMPLE); }}
+            >
+              {t.decoder.approveSample}
+            </button>
+            <button
+              type="button"
+              className="link link-secondary text-xs"
+              onClick={() => { setMode('calldata'); setCalldataInput(NESTED_MULTICALL_EXAMPLE); }}
+            >
+              {t.decoder.callTreeSample}
+            </button>
+          </div>
         </div>
 
         {showResult && (
@@ -120,11 +162,24 @@ export default function DecoderPage() {
 
             {isError && (
               <div className="alert alert-error" role="alert">
-                <span className="text-sm">{t.decoder.failed}</span>
+                <span className="text-sm">
+                  {error instanceof NoCalldataError
+                    ? t.decoder.noCalldata
+                    : mode === 'tx'
+                      ? t.decoder.txLookupFailed
+                      : t.decoder.calldataFailed}
+                </span>
               </div>
             )}
 
-            {data && <DecodedView data={data} chainId={chainId} />}
+            {data && (
+              <>
+                <p className="mb-4 text-sm text-base-content/70" role="status">
+                  {data.source === 'tx' ? t.decoder.txResultNote : t.decoder.calldataResultNote}
+                </p>
+                <DecodedView data={data} chainId={chainId} />
+              </>
+            )}
           </div>
         )}
 
