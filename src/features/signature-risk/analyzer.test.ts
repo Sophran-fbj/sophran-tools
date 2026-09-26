@@ -63,6 +63,7 @@ describe('analyzeTypedData', () => {
 
     expect(result.danger).toBe('high');
     expect(result.title).toBe('Permit2 token spending approval');
+    expect(result.permit2Mode).toBe('allowance');
     expect(result.findings.some((f) => f.label === 'Token')).toBe(true);
     expect(result.findings.some((f) => f.label === 'Spender')).toBe(true);
     expect(result.findings).toEqual(
@@ -75,6 +76,44 @@ describe('analyzeTypedData', () => {
       ]),
     );
     expect(result.schemaValidated).toBe(false);
+  });
+
+  it('distinguishes one-time Permit2 transfer from a standing allowance', () => {
+    const result = analyzeTypedData(JSON.stringify({
+      domain: { name: 'Permit2' },
+      primaryType: 'PermitTransferFrom',
+      message: {
+        permitted: {
+          token: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
+          amount: '100',
+        },
+        nonce: '7',
+        deadline: '4102444800',
+      },
+    }));
+
+    expect(result.riskKind).toBe('permit2');
+    expect(result.permit2Mode).toBe('transfer');
+    expect(result.explain).toContain('does not create a standing');
+  });
+
+  it('handles hex-encoded unsigned amounts without treating zero as a positive allowance', () => {
+    const message = {
+      owner: '0xFb3C2B2769A2119f349233A44A640F090C907667',
+      spender: '0xE592427A0AEce92De3Edee1F18E0157C05861564',
+      deadline: '4102444800',
+    };
+    const analyzeAmount = (value: string) => analyzeTypedData(JSON.stringify({
+      domain: { name: 'Token' }, primaryType: 'Permit',
+      message: { ...message, value },
+    }));
+
+    expect(analyzeAmount('0x0').danger).toBe('medium');
+    const unlimited = analyzeAmount(`0x${(2n ** 256n - 1n).toString(16)}`);
+    expect(unlimited.danger).toBe('high');
+    expect(unlimited.findings).toEqual(expect.arrayContaining([
+      expect.objectContaining({ value: 'Unlimited (uint256 max)' }),
+    ]));
   });
 
   it('walks every item in a Permit2 batch using the declared schema', () => {
@@ -171,7 +210,11 @@ describe('analyzeTypedData', () => {
     const result = analyzeTypedData(JSON.stringify({
       domain: { name: 'Seaport' },
       primaryType: 'Order',
-      message: { deadline: '1' },
+      message: {
+        offer: [{ token: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' }],
+        consideration: [{ recipient: '0xE592427A0AEce92De3Edee1F18E0157C05861564' }],
+        deadline: '1',
+      },
     }));
 
     expect(result.signatureExpired).toBe(true);

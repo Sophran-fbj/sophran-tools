@@ -35,6 +35,7 @@ export interface SignatureAnalysis {
   primaryType?: string;
   danger: SignatureDanger;
   riskKind: SignatureRiskKind;
+  permit2Mode?: 'allowance' | 'transfer';
   title: string;
   explain: string;
   findings: FieldFinding[];
@@ -70,6 +71,7 @@ export function analyzeTypedData(input: string): SignatureAnalysis {
   const typedData = normalizeTypedDataShape(parseJson(input));
   const { domain, primaryType, message, types } = typedData;
   const verifyingContract = asAddress(domain.verifyingContract);
+  if (types?.EIP712Domain) collectTypedLeaves(types, 'EIP712Domain', domain);
   const leaves = types && primaryType
     ? collectTypedLeaves(types, primaryType, message)
     : collectFallbackLeaves(message);
@@ -82,19 +84,15 @@ export function analyzeTypedData(input: string): SignatureAnalysis {
   const hasPositiveAmount = findings.some(
     (finding) =>
       finding.kind === 'amount' &&
-      finding.value !== '0' &&
-      !finding.value.startsWith('0 '),
+      (finding.severity === 'high' ||
+        (finding.severity === 'medium' && parseUnsignedInteger(finding.value) !== 0n)),
   );
   const hasSpender = findings.some((finding) => finding.kind === 'spender');
-  const hasOperator = findings.some((finding) => finding.kind === 'operator');
   const signatureExpired = findings.some(
     (finding) =>
       finding.kind === 'deadline' &&
       finding.expired &&
       /(?:^|\.)(?:deadline|sigDeadline)$/i.test(finding.path ?? ''),
-  );
-  const hasDeadlineRisk = findings.some(
-    (finding) => finding.kind === 'deadline' && finding.severity === 'medium',
   );
 
   let danger: SignatureDanger = 'unknown';
@@ -103,13 +101,15 @@ export function analyzeTypedData(input: string): SignatureAnalysis {
   let explain =
     'Signature Risk cannot confidently classify this typed-data payload. Review every address, amount, and deadline before signing.';
 
-  if (permitKind === 'permit2') {
+  if (permitKind === 'permit2-allowance' || permitKind === 'permit2-transfer') {
     danger = hasUnlimited || (hasSpender && hasPositiveAmount)
       ? 'high'
       : 'medium';
     riskKind = 'permit2';
     title = 'Permit2 token spending approval';
-    explain = 'This signature can grant a spender permission through Uniswap Permit2. It may move tokens later without a separate approval transaction.';
+    explain = permitKind === 'permit2-transfer'
+      ? 'This matches a one-time Permit2 transfer signature. It can authorize token movement when submitted, but does not create a standing Permit2 spender allowance.'
+      : 'This matches a Permit2 standing allowance signature. It can authorize a spender to move tokens until the allowance is exhausted or expires.';
   } else if (permitKind === 'erc20-permit') {
     danger = hasUnlimited || (hasSpender && hasPositiveAmount)
       ? 'high'
@@ -122,14 +122,6 @@ export function analyzeTypedData(input: string): SignatureAnalysis {
     riskKind = 'nft-order';
     title = 'NFT or order signature';
     explain = 'This looks like an order-style signature. Signing can authorize a marketplace or conduit to move NFTs or settle an order.';
-  } else if (hasOperator) {
-    danger = 'high';
-    riskKind = 'operator';
-    title = 'Operator authorization';
-    explain =
-      'This signature names an operator. Operators can be dangerous because they may act on assets after the signature is accepted.';
-  } else if (hasDeadlineRisk) {
-    danger = 'medium';
   }
 
   return {
@@ -139,6 +131,9 @@ export function analyzeTypedData(input: string): SignatureAnalysis {
     primaryType,
     danger,
     riskKind,
+    permit2Mode: permitKind === 'permit2-allowance'
+      ? 'allowance'
+      : permitKind === 'permit2-transfer' ? 'transfer' : undefined,
     title,
     explain,
     findings,
@@ -175,6 +170,7 @@ function parseTypes(value: unknown): Record<string, TypedDataField[]> | undefine
   const output: Record<string, TypedDataField[]> = {};
   for (const [typeName, fields] of Object.entries(value)) {
     if (!Array.isArray(fields)) throw new Error(`Type ${typeName} must be an array.`);
+    const names = new Set<string>();
     output[typeName] = fields.map((field) => {
       if (
         !isRecord(field) ||
@@ -183,10 +179,30 @@ function parseTypes(value: unknown): Record<string, TypedDataField[]> | undefine
       ) {
         throw new Error(`Type ${typeName} contains an invalid field.`);
       }
+      if (names.has(field.name)) throw new Error(`Type ${typeName} repeats field ${field.name}.`);
+      names.add(field.name);
       return { name: field.name, type: field.type };
     });
   }
+  for (const [typeName, fields] of Object.entries(output)) {
+    for (const field of fields) {
+      const baseType = field.type.replace(/(\[\d*\])+$/, '');
+      const suffix = field.type.slice(baseType.length);
+      if (!/^(\[\d*\])*$/.test(suffix) || (!isPrimitiveType(baseType) && !output[baseType])) {
+        throw new Error(`Type ${typeName}.${field.name} has unsupported type ${field.type}.`);
+      }
+    }
+  }
   return output;
+}
+
+function isPrimitiveType(type: string): boolean {
+  if (type === 'address' || type === 'bool' || type === 'string' || type === 'bytes') return true;
+  if (/^bytes(?:[1-9]|[12]\d|3[012])$/.test(type)) return true;
+  const integer = /^(?:u?int)(\d+)$/.exec(type);
+  if (!integer) return false;
+  const bits = Number(integer[1]);
+  return bits >= 8 && bits <= 256 && bits % 8 === 0;
 }
 
 function normalizeTypedDataShape(parsed: unknown): TypedDataLike {
@@ -268,11 +284,48 @@ function collectTypedLeaves(
       return;
     }
 
+    validateTypedValue(type, value, path);
     leaves.push({ name, type, value, path });
   }
 
   visit(primaryType, message, primaryType, 'message', 0);
   return leaves;
+}
+
+function validateTypedValue(type: string, value: unknown, path: string): void {
+  if (type === 'address') {
+    if (typeof value !== 'string' || !isAddress(value)) throw new Error(`${path} must be an address.`);
+    return;
+  }
+  if (type === 'bool') {
+    if (typeof value !== 'boolean') throw new Error(`${path} must be a boolean.`);
+    return;
+  }
+  if (type === 'string') {
+    if (typeof value !== 'string') throw new Error(`${path} must be a string.`);
+    return;
+  }
+  if (type === 'bytes' || /^bytes\d+$/.test(type)) {
+    const bytes = /^bytes(\d+)$/.exec(type);
+    if (typeof value !== 'string' || !/^0x(?:[0-9a-fA-F]{2})*$/.test(value) ||
+      (bytes && (value.length - 2) / 2 !== Number(bytes[1]))) {
+      throw new Error(`${path} must be valid ${type} data.`);
+    }
+    return;
+  }
+  const integer = /^(u?int)(\d+)$/.exec(type);
+  if (!integer) throw new Error(`${path} has unsupported type ${type}.`);
+  const numeric = typeof value === 'number'
+    ? Number.isSafeInteger(value) ? BigInt(value) : undefined
+    : typeof value === 'string' && /^(?:-?\d+|0x[0-9a-fA-F]+)$/.test(value)
+      ? BigInt(value)
+      : undefined;
+  if (numeric === undefined) throw new Error(`${path} must be a ${type} integer.`);
+  const bits = BigInt(integer[2]);
+  const signed = integer[1] === 'int';
+  const min = signed ? -(2n ** (bits - 1n)) : 0n;
+  const max = 2n ** (signed ? bits - 1n : bits) - 1n;
+  if (numeric < min || numeric > max) throw new Error(`${path} exceeds the ${type} range.`);
 }
 
 function collectFallbackLeaves(value: unknown): TypedLeaf[] {
@@ -348,36 +401,44 @@ function classifyPermit(
   primaryType: string | undefined,
   message: Record<string, unknown>,
   domain: Record<string, unknown>,
-): 'permit2' | 'erc20-permit' | 'nft-order' | 'unknown' {
-  const domainName = String(domain.name ?? '').toLowerCase();
-  const type = String(primaryType ?? '').toLowerCase();
-  const keys = new Set(Object.keys(message).map((key) => key.toLowerCase()));
+): 'permit2-allowance' | 'permit2-transfer' | 'erc20-permit' | 'nft-order' | 'unknown' {
+  const domainName = typeof domain.name === 'string' ? domain.name.toLowerCase() : '';
+  const type = primaryType?.toLowerCase();
+  const allowanceType = type === 'permitsingle' || type === 'permitbatch';
+  const transferType = type !== undefined && /^permit(?:batch)?(?:witness)?transferfrom$/.test(type);
+  const permit2Domain = domainName === 'permit2';
+  const isPermission = (item: unknown): boolean =>
+    isRecord(item) && Boolean(asAddress(item.token)) && isUnsignedValue(item.amount);
+  const permissionItems = (item: unknown): boolean =>
+    Array.isArray(item) ? item.length > 0 && item.every(isPermission) : isPermission(item);
+  const isAllowanceDetails = (item: unknown): boolean =>
+    isPermission(item) && isRecord(item) &&
+    isUnsignedValue(item.expiration) && isUnsignedValue(item.nonce);
+  const allowanceItems = (item: unknown): boolean =>
+    Array.isArray(item) ? item.length > 0 && item.every(isAllowanceDetails) : isAllowanceDetails(item);
+  const hasAllowanceShape = allowanceItems(message.details) &&
+    Boolean(asAddress(message.spender)) && isUnsignedValue(message.sigDeadline);
+  const hasTransferShape = permissionItems(message.permitted) &&
+    isUnsignedValue(message.nonce) && isUnsignedValue(message.deadline);
 
-  if (
-    domainName.includes('permit2') ||
-    type.includes('permittransferfrom') ||
-    type.includes('permitbatch') ||
-    type === 'permitsingle' ||
-    keys.has('permitted') ||
-    keys.has('sigdeadline')
-  ) {
-    return 'permit2';
-  }
-  if (
-    type === 'permit' ||
-    (keys.has('owner') && keys.has('spender') && keys.has('value') && keys.has('deadline'))
-  ) {
+  if ((allowanceType || (!type && permit2Domain)) && hasAllowanceShape) return 'permit2-allowance';
+  if ((transferType || (!type && permit2Domain)) && hasTransferShape) return 'permit2-transfer';
+  if ((type === 'permit' || !type) &&
+    Boolean(asAddress(message.owner)) && Boolean(asAddress(message.spender)) &&
+    isUnsignedValue(message.value) && isUnsignedValue(message.deadline)) {
     return 'erc20-permit';
   }
-  if (
-    domainName.includes('seaport') ||
-    type.includes('order') ||
-    keys.has('offer') ||
-    keys.has('consideration')
-  ) {
+  if (Array.isArray(message.offer) && message.offer.length > 0 &&
+    Array.isArray(message.consideration) && message.consideration.length > 0 &&
+    (!type || /order/.test(type))) {
     return 'nft-order';
   }
   return 'unknown';
+}
+
+function isUnsignedValue(value: unknown): boolean {
+  return (typeof value === 'string' && parseUnsignedInteger(value) !== undefined) ||
+    (typeof value === 'number' && Number.isSafeInteger(value) && value >= 0);
 }
 
 function amountFinding(value: unknown, type: string | undefined, path: string): FieldFinding {
@@ -388,7 +449,7 @@ function amountFinding(value: unknown, type: string | undefined, path: string): 
     numeric !== undefined &&
     (numeric === declaredMax || numeric.toString() === MAX_UINT160 || numeric.toString() === MAX_UINT256);
   const isZero = numeric === 0n;
-  const maxType = type ?? (text === MAX_UINT160 ? 'uint160' : text === MAX_UINT256 ? 'uint256' : 'integer');
+  const maxType = type ?? (numeric?.toString() === MAX_UINT160 ? 'uint160' : numeric?.toString() === MAX_UINT256 ? 'uint256' : 'integer');
   return {
     label: 'Amount',
     kind: 'amount',
@@ -413,7 +474,7 @@ function maxValueForUint(type: string | undefined): bigint | undefined {
 }
 
 function parseUnsignedInteger(value: string): bigint | undefined {
-  if (!/^\d+$/.test(value)) return undefined;
+  if (!/^(?:\d+|0x[0-9a-fA-F]+)$/.test(value)) return undefined;
   try {
     return BigInt(value);
   } catch {

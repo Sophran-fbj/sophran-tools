@@ -367,7 +367,9 @@ export const messages = {
         unknown:
           'Signature Risk 无法可靠分类这段 typed data。签名前请逐项检查地址、金额和到期时间。',
         permit2:
-          '这个签名可以通过 Uniswap Permit2 授予 spender 花费权限。它可能在之后移动代币，而不需要单独的 approve 交易。',
+          '这符合 Permit2 持续额度授权的结构：spender 可能在额度和有效期内使用代币。',
+        permit2Transfer:
+          '这符合 Permit2 一次性转账签名的结构：提交后可能转移代币，但不会因此留下持续的 Permit2 spender 额度。',
         erc20Permit:
           '这个签名可以在不发送链上 approve 交易的情况下授权 spender 花费代币。',
         nftOrder:
@@ -770,7 +772,9 @@ export const messages = {
         unknown:
           'Signature Risk cannot confidently classify this typed-data payload. Review every address, amount, and deadline before signing.',
         permit2:
-          'This signature can grant a spender permission through Uniswap Permit2. It may move tokens later without a separate approval transaction.',
+          'This matches a Permit2 standing allowance: the spender may use tokens within its amount and expiration.',
+        permit2Transfer:
+          'This matches a one-time Permit2 transfer signature: it may move tokens when submitted, but does not create a standing Permit2 spender allowance.',
         erc20Permit:
           'This signature can approve token spending without sending an on-chain approve transaction first.',
         nftOrder:
