@@ -21,7 +21,7 @@ import {
 } from '@/features/txray/chains/chains';
 import { useTokenPrices } from '@/features/txray/approvals/useTokenPrices';
 import { ApprovalRow } from '@/features/txray/approvals/ApprovalRow';
-import { LanguageToggle } from '@/components/LanguageToggle';
+import { AppearanceControls } from '@/components/AppearanceControls';
 import { useI18n } from '@/lib/i18n/provider';
 import type { ApprovalWarning } from '@/features/txray/approvals/types';
 
@@ -144,7 +144,7 @@ function ApprovalsContent() {
             </p>
           </div>
           <div className="flex items-center gap-2 self-end sm:self-auto">
-            <LanguageToggle />
+            <AppearanceControls />
             <WalletButton />
           </div>
         </div>

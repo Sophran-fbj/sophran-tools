@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { LanguageToggle } from '@/components/LanguageToggle';
+import { AppearanceControls } from '@/components/AppearanceControls';
 import { useI18n } from '@/lib/i18n/provider';
 
 export default function Home() {
@@ -15,7 +15,7 @@ export default function Home() {
             <h1 className="text-4xl font-bold text-primary">{t.home.title}</h1>
             <p className="mt-4 text-base-content/80">{t.home.subtitle}</p>
           </div>
-          <LanguageToggle />
+          <AppearanceControls />
         </div>
 
         <div className="mt-10 grid gap-4 md:grid-cols-2">

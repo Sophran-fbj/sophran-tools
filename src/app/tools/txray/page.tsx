@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { LanguageToggle } from '@/components/LanguageToggle';
+import { AppearanceControls } from '@/components/AppearanceControls';
 import { WalletButton } from '@/components/WalletButton';
 import { useI18n } from '@/lib/i18n/provider';
 
@@ -23,7 +23,7 @@ export default function TxRayPage() {
             <p className="mt-2 text-base-content/80">{t.txray.intro}</p>
           </div>
           <div className="flex items-center gap-3">
-            <LanguageToggle />
+            <AppearanceControls />
             <WalletButton />
           </div>
         </div>

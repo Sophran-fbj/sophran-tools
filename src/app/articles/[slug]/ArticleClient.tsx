@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { LanguageToggle } from '@/components/LanguageToggle';
+import { AppearanceControls } from '@/components/AppearanceControls';
 import { pickText, type Article } from '@/content/articles';
 import { useI18n } from '@/lib/i18n/provider';
 
@@ -20,7 +20,7 @@ export function ArticleClient({ article }: { article: Article }) {
               ← {t.common.articles}
             </Link>
           </div>
-          <LanguageToggle />
+          <AppearanceControls />
         </div>
 
         <div className="mt-4 flex flex-wrap gap-2">

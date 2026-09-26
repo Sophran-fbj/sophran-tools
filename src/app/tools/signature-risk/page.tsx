@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { LanguageToggle } from '@/components/LanguageToggle';
+import { AppearanceControls } from '@/components/AppearanceControls';
 import { WalletButton } from '@/components/WalletButton';
 import { useI18n } from '@/lib/i18n/provider';
 import {
@@ -134,7 +134,7 @@ export default function SignaturePage() {
             <p className="mt-1 text-sm text-base-content/60">{copy.desc}</p>
           </div>
           <div className="flex items-center gap-3">
-            <LanguageToggle />
+            <AppearanceControls />
             <WalletButton />
           </div>
         </div>

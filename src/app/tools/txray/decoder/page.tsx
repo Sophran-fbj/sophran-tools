@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { getAddress, isAddress } from 'viem';
 import { WalletButton } from '@/components/WalletButton';
-import { LanguageToggle } from '@/components/LanguageToggle';
+import { AppearanceControls } from '@/components/AppearanceControls';
 import {
   isMaxUintValue,
   useDecoder,
@@ -51,7 +51,7 @@ export default function DecoderPage() {
             </p>
           </div>
           <div className="flex items-center gap-2 self-end sm:self-auto">
-            <LanguageToggle />
+            <AppearanceControls />
             <WalletButton />
           </div>
         </div>
