@@ -103,11 +103,17 @@ export default function SignaturePage() {
       return;
     }
     try {
+      JSON.parse(trimmed);
+    } catch {
+      setResult({ status: 'error', error: copy.invalidJson });
+      return;
+    }
+    try {
       setResult({ status: 'ok', data: analyzeTypedData(trimmed) });
-    } catch (e) {
+    } catch {
       setResult({
         status: 'error',
-        error: e instanceof Error ? e.message : copy.failed,
+        error: copy.invalidTypedData,
       });
     }
   }
@@ -143,10 +149,20 @@ export default function SignaturePage() {
           <span>{copy.readonly}</span>
         </div>
 
+        <details className="collapse-arrow collapse mt-4 bg-base-200 text-sm">
+          <summary className="collapse-title font-medium">{copy.howToGetTitle}</summary>
+          <div className="collapse-content space-y-2 text-base-content/70">
+            <p>{copy.howToGet}</p>
+            <p>{copy.cannotReadPopup}</p>
+          </div>
+        </details>
+
         <div className="form-control mt-6">
-          <label className="label">
-            <span className="label-text">{copy.inputLabel}</span>
-            <span className="flex gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <label className="label" htmlFor="typed-data-input">
+              <span className="label-text">{copy.inputLabel}</span>
+            </label>
+            <div className="flex gap-2">
               <button
                 type="button"
                 className="link link-primary text-xs"
@@ -161,9 +177,10 @@ export default function SignaturePage() {
               >
                 {copy.permit2Sample}
               </button>
-            </span>
-          </label>
+            </div>
+          </div>
           <textarea
+            id="typed-data-input"
             value={input}
             onChange={(e) => {
               setInput(e.target.value);
@@ -172,7 +189,11 @@ export default function SignaturePage() {
             placeholder={copy.placeholder}
             className="textarea textarea-bordered min-h-72 w-full break-all font-mono text-xs"
             spellCheck={false}
+            aria-describedby="typed-data-help"
           />
+          <p id="typed-data-help" className="mt-2 text-xs text-base-content/70">
+            {copy.inputHelp}
+          </p>
         </div>
         <div className="mt-4 flex justify-end">
           <button
@@ -193,7 +214,7 @@ export default function SignaturePage() {
             </div>
           )}
           {result.status === 'error' && (
-            <div className="alert alert-error text-sm">{result.error}</div>
+            <div className="alert alert-error text-sm" role="alert">{result.error}</div>
           )}
           {result.status === 'ok' && <AnalysisView data={result.data} />}
         </div>
@@ -208,6 +229,12 @@ function AnalysisView({ data }: { data: SignatureAnalysis }) {
 
   return (
     <div className="space-y-4">
+      {!data.schemaValidated && (
+        <div className="alert alert-warning text-sm" role="status">
+          {copy.schemaFallback}
+        </div>
+      )}
+
       <div className={`alert ${dangerClass(data.danger)}`}>
         <div>
           <div className="font-bold">{riskTitle(t, data.riskKind)}</div>
@@ -216,10 +243,6 @@ function AnalysisView({ data }: { data: SignatureAnalysis }) {
           </div>
         </div>
       </div>
-
-      {!data.schemaValidated && (
-        <div className="alert alert-warning text-sm">{copy.schemaFallback}</div>
-      )}
 
       <div className="grid gap-3 md:grid-cols-4">
         <InfoCard label={copy.domain} value={data.domainName ?? copy.unknown} />

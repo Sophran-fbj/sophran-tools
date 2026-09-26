@@ -326,7 +326,13 @@ export const messages = {
       desc: '粘贴 EIP-712 typed data，检查这次签名可能授权什么。',
       readonly:
         '这是只读分析。Signature Risk 不会要求你签署粘贴的内容。看懂 spender、amount 和 deadline 之前，不要信任陌生签名请求。',
+      howToGetTitle: '需要粘贴什么？',
+      howToGet: '使用钱包或发起签名的应用提供的“复制 / 查看原始数据”功能，获取 EIP-712 typed-data JSON；尽量包含 domain、types、primaryType 和 message。不要粘贴私钥或助记词。',
+      cannotReadPopup: '如果弹窗只显示可读字段、无法复制原始 JSON，本站不能自动读取这个弹窗，也就无法完整分析该签名。',
       inputLabel: 'Typed-data JSON',
+      inputHelp: '单独的签名哈希、截图或弹窗文字不是 typed-data JSON。',
+      invalidJson: '输入不是有效的 JSON；请复制完整的原始 typed-data 数据。',
+      invalidTypedData: '无法可靠读取这段数据；请确认它是包含 message 的 EIP-712 typed-data JSON，且结构完整。',
       permitSample: 'ERC-20 permit 示例',
       permit2Sample: 'Permit2 示例',
       placeholder:
@@ -343,7 +349,7 @@ export const messages = {
       fields: '安全关键字段',
       noFields:
         '未检测到常见 permit 或 operator 字段。签名前仍需检查原始 message。',
-      schemaFallback: '缺少完整 types schema；当前结果使用保守字段扫描，不能视为完整解析。',
+      schemaFallback: '缺少完整的 types schema 或 primaryType：下方只显示识别到的字段线索，无法完整判断这次签名；不要据此认定它安全。',
       expiredExplain: '签名截止时间已经过去，这段 payload 应无法再成功执行。',
       chainId: 'Chain ID',
       field: '字段',
@@ -722,7 +728,13 @@ export const messages = {
       desc: 'Paste EIP-712 typed data and inspect what a signature can authorize.',
       readonly:
         'This is read-only analysis. Signature Risk will never ask you to sign the pasted payload. Treat unknown signature requests as hostile until you understand the spender, amount, and deadline.',
+      howToGetTitle: 'What should I paste?',
+      howToGet: 'Use a Copy or View raw data option in the wallet or requesting app to obtain the EIP-712 typed-data JSON. Include domain, types, primaryType, and message where available. Never paste a private key or seed phrase.',
+      cannotReadPopup: 'If the popup shows only readable fields and offers no raw JSON, this site cannot read that popup or fully analyze the signature.',
       inputLabel: 'Typed-data JSON',
+      inputHelp: 'A signature hash, screenshot, or copied popup text is not typed-data JSON.',
+      invalidJson: 'This is not valid JSON. Copy the complete raw typed-data payload.',
+      invalidTypedData: 'Could not reliably read this payload. Check that it is a complete EIP-712 typed-data JSON object containing message.',
       permitSample: 'ERC-20 permit sample',
       permit2Sample: 'Permit2 sample',
       placeholder:
@@ -740,7 +752,7 @@ export const messages = {
       noFields:
         'No common permit or operator fields were detected. Inspect the raw message before signing.',
       schemaFallback:
-        'A complete types schema is missing. This result uses conservative field scanning and is not a complete parse.',
+        'A complete types schema or primaryType is missing. Only recognizable fields are shown below; this is not a complete assessment and must not be treated as safe.',
       expiredExplain: 'The signature deadline has passed, so this payload should no longer execute.',
       chainId: 'Chain ID',
       field: 'Field',
